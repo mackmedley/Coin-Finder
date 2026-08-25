@@ -336,6 +336,9 @@
   .feed-sec h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); font-size: 11.5px; }
   .feed-item { padding: 8px 0; }
   .feed-item + .feed-item { border-top: 1px solid var(--line-soft); }
+  .feed-item .feed-meta button { font-size: 11.5px; padding: 3px 9px; }
+  #feed-social { position: sticky; top: 74px; }
+  @media (max-width: 860px) { #feed-social { position: static; } }
   .feed-item a { color: var(--text); text-decoration: none; font-size: 13.5px; line-height: 1.45; }
   .feed-item a:hover { color: var(--accent); }
   .feed-meta { font-size: 11.5px; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -515,15 +518,14 @@
       <span class="header-meta">Public feeds, read-only — nothing is posted anywhere.</span>
     </div>
     <div class="tiles" id="feed-tiles" hidden></div>
+    <div class="toolbar">
+      <input id="feed-search" class="search" type="search" placeholder="Search the feed…">
+      <div class="chips" id="feed-chips"></div>
+    </div>
+    <div id="feed-status"></div>
     <div class="feed-cols">
-      <div>
-        <div class="feed-sec" id="feed-news"></div>
-        <div class="feed-sec" id="feed-reddit"></div>
-      </div>
-      <div>
-        <div class="feed-sec" id="feed-trending"></div>
-        <div class="feed-sec" id="feed-profiles"></div>
-      </div>
+      <div id="feed-stream"></div>
+      <div id="feed-social"></div>
     </div>
   </section>
 
@@ -1733,16 +1735,142 @@ function renderWatchlist(priced) {
 /* ------------------------------------------------------------------ *
  * Feed tab — read-only public signals, meme-coin focused
  *
- * Every source loads independently and fails independently: a blocked or
- * down feed shows a one-line note in its own section, never an error page.
+ * Eight sources merged into one stream. Every source loads and fails
+ * independently: a blocked or down feed drops out of the stream and is
+ * named in the status line, never an error page.
+ *
+ * On X/Twitter: there is no free public API, Nitter's public instances
+ * have collapsed, and scraping X breaks its terms of service. So this
+ * does not read X — it hands off, deep-linking into X's own search for
+ * a ticker or contract address, which is what you'd type yourself.
  * ------------------------------------------------------------------ */
 
-const FEED = { loadedAt: 0, loading: false, mood: null, trending: null, news: null, reddit: null, profiles: null, showAllNews: false };
+const FEED = {
+  loadedAt: 0, loading: false, mood: null, items: [], failed: [], ok: 0,
+  filter: "all", query: "",
+};
 
-const MEME_RE = /meme|doge|shiba?|pepe|bonk|\bwif\b|floki|\binu\b|frog coin|moon ?shot|pump\.?fun|degen|fartcoin|\bcat coin\b/i;
+const MEME_RE = /meme|doge|shiba?|pepe|bonk|\bwif\b|floki|\binu\b|frog coin|moon ?shot|pump\.?fun|degen|fartcoin|\bcat coin\b|trump coin|\bmog\b|brett|popcat/i;
 
-function newsIsMeme(item) {
-  return MEME_RE.test(`${item.title || ""} ${item.categories || ""} ${item.body || ""}`);
+const SUBREDDITS = ["CryptoMoonShots", "memecoins", "SatoshiStreetBets", "solana"];
+
+const GECKO = "https://api.geckoterminal.com/api/v2";
+
+function isMemeText(text) { return MEME_RE.test(String(text || "")); }
+
+/** X search deep-link — a handoff, never a scrape. */
+function xSearchUrl(term) {
+  return "https://x.com/search?q=" + encodeURIComponent(term) + "&f=live";
+}
+
+function feedTime(item) { return item.time || 0; }
+
+/* ---- source parsers: each returns an array of unified items ---- */
+
+function parseNews(payload) {
+  const rows = payload && Array.isArray(payload.Data) ? payload.Data : null;
+  if (!rows) throw new Error("shape");
+  return rows.slice(0, 40).map((n) => ({
+    kind: "news",
+    title: String(n.title || ""),
+    url: String(n.url || ""),
+    source: String((n.source_info && n.source_info.name) || n.source || "news"),
+    time: Number(n.published_on) * 1000 || 0,
+    meme: isMemeText(`${n.title} ${n.categories} ${n.body}`),
+  }));
+}
+
+function parseReddit(payload, sub) {
+  const children = payload && payload.data && Array.isArray(payload.data.children) ? payload.data.children : null;
+  if (!children) throw new Error("shape");
+  return children
+    .filter((ch) => ch && ch.data && !ch.data.stickied)
+    .map((ch) => ch.data)
+    .filter((d) => sub === "solana" ? isMemeText(d.title) : true)  // r/solana is broad: meme posts only
+    .map((d) => ({
+      kind: "reddit",
+      title: String(d.title || ""),
+      url: "https://www.reddit.com" + String(d.permalink || ""),
+      source: "r/" + String(d.subreddit || sub),
+      time: Number(d.created_utc) * 1000 || 0,
+      score: Number(d.score) || 0,
+      id: String(d.permalink || d.title),
+      meme: true,
+    }));
+}
+
+function parseTrendingSearch(payload) {
+  const coins = payload && Array.isArray(payload.coins) ? payload.coins : null;
+  if (!coins) throw new Error("shape");
+  return coins.map((c) => c.item).filter(Boolean).slice(0, 10).map((t, i) => ({
+    kind: "trending",
+    title: `${t.symbol || "?"} — ${t.name || ""}`,
+    url: "https://www.coingecko.com/en/coins/" + encodeURIComponent(t.id || ""),
+    source: "search rank #" + (i + 1),
+    time: 0,
+    symbol: String(t.symbol || ""),
+    meme: isMemeText(`${t.name} ${t.symbol}`),
+  }));
+}
+
+/** GeckoTerminal pools: the feed other meme apps run on. */
+function parsePools(payload, kind) {
+  const rows = payload && Array.isArray(payload.data) ? payload.data : null;
+  if (!rows) throw new Error("shape");
+  return rows.slice(0, 20).map((row) => {
+    const a = row.attributes || {};
+    const rel = row.relationships || {};
+    const netId = dig(rel, "network", "data", "id") || String(row.id || "").split("_")[0];
+    const chain = String(netId || "").toLowerCase();
+    const address = String(a.address || String(row.id || "").split("_").slice(1).join("_"));
+    const h1 = num(dig(a, "price_change_percentage", "h1"));
+    const vol = num(dig(a, "volume_usd", "h24"));
+    return {
+      kind,
+      title: String(a.name || "?"),
+      url: `https://www.geckoterminal.com/${encodeURIComponent(chain)}/pools/${encodeURIComponent(address)}`,
+      source: chain,
+      time: a.pool_created_at ? Date.parse(a.pool_created_at) || 0 : 0,
+      chain,
+      pair: address,
+      symbol: String(a.name || "").split("/")[0].trim(),
+      liquidity: num(a.reserve_in_usd),
+      volume: vol,
+      change_h1: h1,
+      meme: true,
+    };
+  });
+}
+
+function parseBoosts(payload) {
+  if (!Array.isArray(payload)) throw new Error("shape");
+  return payload.slice(0, 12).map((b) => ({
+    kind: "promo",
+    title: `${String(b.tokenAddress || "").slice(0, 12)}… boosted`,
+    url: String(b.url || ""),
+    source: String(b.chainId || "?"),
+    time: 0,
+    amount: num(b.totalAmount),
+    token: String(b.tokenAddress || ""),
+    chain: String(b.chainId || "").toLowerCase(),
+    description: String(b.description || ""),
+    meme: true,
+  }));
+}
+
+function parseProfiles(payload) {
+  if (!Array.isArray(payload)) throw new Error("shape");
+  return payload.slice(0, 12).map((p) => ({
+    kind: "promo",
+    title: `${String(p.tokenAddress || "").slice(0, 12)}… new profile`,
+    url: String(p.url || ""),
+    source: String(p.chainId || "?"),
+    time: 0,
+    token: String(p.tokenAddress || ""),
+    chain: String(p.chainId || "").toLowerCase(),
+    description: String(p.description || ""),
+    meme: true,
+  }));
 }
 
 async function loadFeed(force) {
@@ -1754,40 +1882,54 @@ async function loadFeed(force) {
   btn.textContent = "Refreshing…";
   renderFeed(true);
 
-  const jobs = {
-    mood: getJson("https://api.alternative.me/fng/?limit=1"),
-    trending: getJson("https://api.coingecko.com/api/v3/search/trending"),
-    news: getJson("https://min-api.cryptocompare.com/data/v2/news/?lang=EN"),
-    reddit1: getJson("https://www.reddit.com/r/CryptoMoonShots/hot.json?limit=15&raw_json=1"),
-    reddit2: getJson("https://www.reddit.com/r/memecoins/hot.json?limit=15&raw_json=1"),
-    profiles: getJson(API + "/token-profiles/latest/v1"),
-  };
-  const out = {};
-  await Promise.all(Object.entries(jobs).map(async ([name, p]) => {
-    try { out[name] = await p; } catch (err) { out[name] = null; }
-  }));
-
-  FEED.mood = out.mood && Array.isArray(out.mood.data) && out.mood.data[0] ? out.mood.data[0] : null;
-  FEED.trending = out.trending && Array.isArray(out.trending.coins)
-    ? out.trending.coins.map((c) => c.item).filter(Boolean).slice(0, 10) : null;
-  FEED.news = out.news && Array.isArray(out.news.Data) ? out.news.Data.slice(0, 40) : null;
-
-  const posts = [];
-  const seen = new Set();  // cross-posts appear in both subs — keep one
-  for (const key of ["reddit1", "reddit2"]) {
-    const children = out[key] && out[key].data && Array.isArray(out[key].data.children) ? out[key].data.children : null;
-    if (!children) continue;
-    for (const ch of children) {
-      if (!ch || !ch.data || ch.data.stickied) continue;
-      const id = ch.data.permalink || ch.data.title;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      posts.push(ch.data);
-    }
+  const sources = [
+    ["Headlines", "https://min-api.cryptocompare.com/data/v2/news/?lang=EN", parseNews],
+    ["Trending searches", "https://api.coingecko.com/api/v3/search/trending", parseTrendingSearch],
+    ["Trending pools", `${GECKO}/networks/trending_pools?page=1`, (p) => parsePools(p, "trending_pool")],
+    ["New pools", `${GECKO}/networks/new_pools?page=1`, (p) => parsePools(p, "newpool")],
+    ["Paid boosts", API + "/token-boosts/top/v1", parseBoosts],
+    ["New profiles", API + "/token-profiles/latest/v1", parseProfiles],
+  ];
+  for (const sub of SUBREDDITS) {
+    sources.push([`r/${sub}`, `https://www.reddit.com/r/${sub}/hot.json?limit=15&raw_json=1`,
+                  (p) => parseReddit(p, sub)]);
   }
-  FEED.reddit = (out.reddit1 || out.reddit2) ? posts.sort((a, b) => b.score - a.score).slice(0, 12) : null;
-  FEED.profiles = Array.isArray(out.profiles) ? out.profiles.slice(0, 10) : null;
 
+  const items = [];
+  const failed = [];
+  let okCount = 0;
+
+  await Promise.all([
+    (async () => {
+      try {
+        const m = await getJson("https://api.alternative.me/fng/?limit=1");
+        FEED.mood = m && Array.isArray(m.data) && m.data[0] ? m.data[0] : null;
+        if (FEED.mood) okCount++;
+      } catch (err) { FEED.mood = null; failed.push("Market mood"); }
+    })(),
+    ...sources.map(async ([name, url, parse]) => {
+      try {
+        const parsed = parse(await getJson(url));
+        if (!parsed.length) throw new Error("empty");
+        items.push(...parsed);
+        okCount++;
+      } catch (err) {
+        failed.push(name);
+      }
+    }),
+  ]);
+
+  // Reddit cross-posts land in several subs; keep the highest-scoring copy.
+  const byId = new Map();
+  for (const item of items) {
+    const id = item.id || (item.kind + "|" + (item.url || item.title));
+    const prev = byId.get(id);
+    if (!prev || (item.score || 0) > (prev.score || 0)) byId.set(id, item);
+  }
+
+  FEED.items = [...byId.values()];
+  FEED.failed = failed;
+  FEED.ok = okCount;
   FEED.loadedAt = Date.now();
   FEED.loading = false;
   btn.disabled = false;
@@ -1795,101 +1937,182 @@ async function loadFeed(force) {
   renderFeed();
 }
 
-function feedSection(title, sub, bodyHtml) {
-  return `<h2>${title}${sub ? `<span class="sub">${sub}</span>` : ""}</h2>${bodyHtml}`;
+/* ---- rendering ---- */
+
+const FEED_FILTERS = [
+  ["all", "Everything"],
+  ["trending_pool", "Trending pools"],
+  ["newpool", "Brand new"],
+  ["news", "News"],
+  ["reddit", "Reddit"],
+  ["trending", "Searches"],
+  ["promo", "Promoted"],
+];
+
+function visibleFeed() {
+  const q = FEED.query.trim().toLowerCase();
+  let rows = FEED.items;
+  if (FEED.filter !== "all") rows = rows.filter((i) => i.kind === FEED.filter);
+  if (q) rows = rows.filter((i) => (i.title + " " + i.source + " " + (i.description || "")).toLowerCase().includes(q));
+  // Rank: pools by volume, everything else newest first, timeless items last.
+  return rows.slice().sort((a, b) => {
+    if (a.kind === b.kind && (a.kind === "trending_pool" || a.kind === "newpool"))
+      return (b.volume || 0) - (a.volume || 0);
+    return feedTime(b) - feedTime(a);
+  }).slice(0, 80);
 }
 
-const FEED_ERR = `<div class="feed-err">Couldn't load this source right now — it may be down or blocked on this network. Refresh to retry.</div>`;
-const FEED_WAIT = `<div class="feed-err">Loading…</div>`;
+function feedItemHtml(item) {
+  const bits = [];
+  if (item.meme && item.kind === "news") bits.push(`<span class="flag" style="cursor:default">meme</span>`);
+  bits.push(`<span>${escapeHtml(item.source)}</span>`);
+  if (item.score) bits.push(`<span>▲ ${item.score}</span>`);
+  if (item.volume) bits.push(`<span>${fmtCompact(item.volume)} 24h vol</span>`);
+  if (item.liquidity) bits.push(`<span>${fmtCompact(item.liquidity)} liq</span>`);
+  if (item.change_h1) bits.push(fmtPct(item.change_h1));
+  if (item.amount) bits.push(`<span>$${Math.round(item.amount)} spent</span>`);
+  if (item.time) bits.push(`<span>${relTime(item.time)}</span>`);
+
+  const actions = [];
+  if (item.chain && item.pair) {
+    actions.push(`<button class="small" data-feed-score="${escapeHtml(item.chain + ":" + item.pair)}">Score it</button>`);
+  }
+  const xTerm = item.token || item.symbol || (item.title || "").split("/")[0].trim();
+  if (xTerm && item.kind !== "news" && item.kind !== "reddit") {
+    actions.push(`<button class="small ghost" data-open-url="${escapeHtml(xSearchUrl(xTerm))}">Search X ↗</button>`);
+  }
+  if (item.token) {
+    actions.push(`<button class="small ghost" data-copy="${escapeHtml(item.token)}">Copy address</button>`);
+  }
+
+  return `<div class="feed-item">
+    <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+    ${item.description ? `<div class="feed-meta">${escapeHtml(item.description.slice(0, 110))}</div>` : ""}
+    <div class="feed-meta">${bits.join("")}</div>
+    ${actions.length ? `<div class="feed-meta" style="margin-top:5px">${actions.join("")}</div>` : ""}
+  </div>`;
+}
 
 function renderFeed(loading) {
-  const tiles = $("#feed-tiles");
   $("#feed-updated").textContent = FEED.loadedAt ? "Updated " + relTime(FEED.loadedAt) : "";
 
-  if (FEED.mood || FEED.news || FEED.trending) {
-    const memeCount = FEED.news ? FEED.news.filter(newsIsMeme).length : 0;
+  // Stat tiles
+  const tiles = $("#feed-tiles");
+  if (FEED.loadedAt) {
     const moodValue = FEED.mood ? Number(FEED.mood.value) : null;
-    const moodClass = moodValue == null ? "" : moodValue >= 70 ? "t-delta down" : moodValue <= 30 ? "t-delta down" : "t-delta";
+    const pools = FEED.items.filter((i) => i.kind === "trending_pool" || i.kind === "newpool").length;
+    const chatter = FEED.items.filter((i) => i.kind === "reddit").length;
+    const headlines = FEED.items.filter((i) => i.kind === "news" && i.meme).length;
     tiles.hidden = false;
     tiles.innerHTML = `
       <div class="tile"><div class="t-label">Market mood</div>
         <div class="t-value">${FEED.mood ? escapeHtml(FEED.mood.value_classification) : "—"}</div>
-        ${FEED.mood ? `<div class="${moodClass}" style="color:var(--muted)">${moodValue}/100 — extremes often mark turns</div>` : ""}</div>
-      <div class="tile"><div class="t-label">Meme headlines</div><div class="t-value">${FEED.news ? memeCount : "—"}</div></div>
-      <div class="tile"><div class="t-label">Hot on Reddit</div><div class="t-value">${FEED.reddit ? FEED.reddit.length : "—"}</div></div>
-      <div class="tile"><div class="t-label">Top trending search</div>
-        <div class="t-value" style="font-size:17px">${FEED.trending && FEED.trending[0] ? escapeHtml(FEED.trending[0].symbol || FEED.trending[0].name || "—") : "—"}</div></div>`;
+        ${FEED.mood ? `<div class="t-delta" style="color:var(--muted)">${moodValue}/100 — extremes often mark turns</div>` : ""}</div>
+      <div class="tile"><div class="t-label">Live pools</div><div class="t-value">${pools}</div></div>
+      <div class="tile"><div class="t-label">Meme headlines</div><div class="t-value">${headlines}</div></div>
+      <div class="tile"><div class="t-label">Reddit chatter</div><div class="t-value">${chatter}</div></div>`;
   } else {
     tiles.hidden = true;
   }
 
-  // Headlines — meme-filtered by default
-  let newsBody;
-  if (loading && !FEED.news) newsBody = FEED_WAIT;
-  else if (!FEED.news) newsBody = FEED_ERR;
-  else {
-    const memeItems = FEED.news.filter(newsIsMeme);
-    const useMeme = !FEED.showAllNews && memeItems.length >= 3;
-    const items = (useMeme ? memeItems : FEED.news).slice(0, 14);
-    newsBody = items.map((n) => `
-      <div class="feed-item">
-        <a href="${escapeHtml(n.url || "#")}" target="_blank" rel="noopener">${escapeHtml(n.title || "")}</a>
-        <div class="feed-meta">
-          ${newsIsMeme(n) ? `<span class="flag" style="cursor:default">meme</span>` : ""}
-          <span>${escapeHtml((n.source_info && n.source_info.name) || n.source || "")}</span>
-          <span>${n.published_on ? relTime(n.published_on * 1000) : ""}</span>
-        </div>
-      </div>`).join("");
-    newsBody += `<div class="feed-item"><button class="small ghost" id="news-toggle">${useMeme ? `Show all crypto news (${FEED.news.length})` : memeItems.length ? `Show meme coverage only (${memeItems.length})` : "Few meme-specific headlines right now — showing all"}</button></div>`;
-  }
-  $("#feed-news").innerHTML = feedSection("Headlines", "meme coverage first", newsBody);
-
-  // Reddit
-  let redditBody;
-  if (loading && !FEED.reddit) redditBody = FEED_WAIT;
-  else if (!FEED.reddit) redditBody = FEED_ERR;
-  else if (!FEED.reddit.length) redditBody = `<div class="feed-err">Nothing hot right now.</div>`;
-  else redditBody = FEED.reddit.map((p) => `
-    <div class="feed-item">
-      <a href="https://www.reddit.com${escapeHtml(p.permalink || "")}" target="_blank" rel="noopener">${escapeHtml(p.title || "")}</a>
-      <div class="feed-meta"><span>r/${escapeHtml(p.subreddit || "")}</span><span>▲ ${Number(p.score) || 0}</span><span>${p.created_utc ? relTime(p.created_utc * 1000) : ""}</span></div>
-    </div>`).join("");
-  $("#feed-reddit").innerHTML = feedSection("Meme-coin Reddit", "r/CryptoMoonShots + r/memecoins — crowd chatter, not advice", redditBody);
-
-  // Trending searches
-  let trendBody;
-  if (loading && !FEED.trending) trendBody = FEED_WAIT;
-  else if (!FEED.trending) trendBody = FEED_ERR;
-  else trendBody = FEED.trending.map((t, i) => `
-    <div class="trend-row">
-      <span class="trend-rank">${i + 1}</span>
-      ${t.thumb ? `<img src="${escapeHtml(t.thumb)}" alt="" onerror="this.style.display='none'">` : ""}
-      <b>${escapeHtml(t.symbol || "")}</b>
-      <span style="color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(t.name || "")}</span>
-      ${MEME_RE.test(`${t.name} ${t.symbol}`) ? `<span class="flag" style="cursor:default">meme</span>` : ""}
-    </div>`).join("");
-  $("#feed-trending").innerHTML = feedSection("Trending searches", "what the crowd is looking up — meme runs start here", trendBody);
-
-  // New promoted tokens
-  let profBody;
-  if (loading && !FEED.profiles) profBody = FEED_WAIT;
-  else if (!FEED.profiles) profBody = FEED_ERR;
-  else profBody = FEED.profiles.map((p) => {
-    const address = String(p.tokenAddress || "");
-    const description = String(p.description || "").slice(0, 90);
-    return `<div class="feed-item">
-      <a href="${escapeHtml(p.url || "#")}" target="_blank" rel="noopener">${escapeHtml(address.slice(0, 10))}… on ${escapeHtml(p.chainId || "?")}</a>
-      ${description ? `<div class="feed-meta">${escapeHtml(description)}</div>` : ""}
-    </div>`;
+  // Filter chips
+  $("#feed-chips").innerHTML = FEED_FILTERS.map(([key, label]) => {
+    const n = key === "all" ? FEED.items.length : FEED.items.filter((i) => i.kind === key).length;
+    return `<button class="chip ${FEED.filter === key ? "on" : ""}" data-feed-filter="${key}">${label}${n ? ` <span style="opacity:.65">${n}</span>` : ""}</button>`;
   }).join("");
-  $("#feed-profiles").innerHTML = feedSection("Just promoted", "tokens that PAID for a profile — marketing, and sometimes an early tell", profBody);
+
+  // Status line
+  const status = $("#feed-status");
+  if (loading && !FEED.items.length) {
+    status.innerHTML = `<div class="notice"><p style="margin:0">Loading ${SUBREDDITS.length + 7} sources…</p></div>`;
+  } else if (FEED.loadedAt && FEED.failed.length && !FEED.ok) {
+    status.innerHTML = networkErrorNotice(new Error("every feed source failed"));
+  } else if (FEED.loadedAt && FEED.failed.length) {
+    status.innerHTML = `<div class="notice"><p style="margin:0">${FEED.ok} sources loaded ·
+      <span style="color:var(--faint)">unavailable right now: ${escapeHtml(FEED.failed.join(", "))}</span></p></div>`;
+  } else {
+    status.innerHTML = "";
+  }
+
+  // Stream
+  const stream = $("#feed-stream");
+  const rows = visibleFeed();
+  if (!FEED.loadedAt && loading) {
+    stream.innerHTML = `<div class="feed-sec">${'<div class="skel-row"></div>'.repeat(6)}</div>`;
+  } else if (!rows.length) {
+    stream.innerHTML = `<div class="feed-sec"><div class="feed-err">${
+      FEED.items.length ? "Nothing matches that filter or search." : "No feed items loaded. Try Refresh."}</div></div>`;
+  } else {
+    stream.innerHTML = `<div class="feed-sec">${rows.map(feedItemHtml).join("")}</div>`;
+  }
+
+  // X handoff panel
+  const tickers = FEED.items.filter((i) => i.kind === "trending" && i.meme).slice(0, 6);
+  $("#feed-social").innerHTML = `
+    <div class="feed-sec">
+      <h2>Social <span class="sub">X has no free API — these open X's own search</span></h2>
+      <div class="chips" style="margin:6px 0">
+        ${tickers.map((t) => `<button class="chip" data-open-url="${escapeHtml(xSearchUrl("$" + t.symbol))}">$${escapeHtml(t.symbol)} ↗</button>`).join("")}
+        <button class="chip" data-open-url="${escapeHtml(xSearchUrl("memecoin OR pumpfun min_faves:50"))}">Meme chatter ↗</button>
+        <button class="chip" data-open-url="${escapeHtml(xSearchUrl("solana memecoin min_faves:100"))}">Solana memes ↗</button>
+      </div>
+      <div class="feed-err" style="padding-top:2px">Any coin's <b>Score it</b> button runs it through the same
+        filters and scoring the scanner uses — that's the check to trust over hype.</div>
+    </div>`;
+}
+
+/* Score a coin straight from the feed — the bridge from chatter to numbers. */
+async function scoreFromFeed(key) {
+  const [chain, pair] = key.split(":");
+  $("#explain-term").textContent = "Scoring…";
+  $("#explain-text").textContent = "Fetching live pair data.";
+  openDialog($("#dlg-explain"));
+  const c = await fetchPair(chain, pair);
+  if (!c) {
+    $("#explain-term").textContent = "Couldn't price it";
+    $("#explain-text").textContent = "No live data came back for that pair — it may be too new to be indexed, or the connection failed.";
+    return;
+  }
+  const reasons = applyFilters(c);
+  const term = $("#explain-term");
+  const text = $("#explain-text");
+  if (reasons.length) {
+    term.textContent = `${c.symbol} — fails the safety filters`;
+    text.innerHTML = `<div>${reasons.map((r) => `<span class="flag">${escapeHtml(r)}</span>`).join("")}</div>
+      <p style="margin-top:10px">These are disqualifiers, not opinions: a coin you can't exit safely isn't worth a score.</p>`;
+    return;
+  }
+  scoreCandidate(c);
+  const b = c.score_breakdown;
+  term.textContent = `${c.symbol} — scores ${c.score.toFixed(0)}/100`;
+  text.innerHTML = `
+    ${meterRow("Liquidity", b.liquidity)}${meterRow("Turnover", b.turnover)}${meterRow("Momentum", b.momentum)}
+    ${meterRow("Buy pressure", b.buy_pressure)}${meterRow("Age fit", b.age_fit)}${meterRow("Safety", b.safety)}
+    ${(c.flags || []).length ? `<div style="margin-top:8px">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
+    <p style="margin-top:10px">${fmtCompact(c.liquidity_usd)} liquidity · ${fmtCompact(c.volume_h24)} 24h volume ·
+      ${(c.buy_ratio_h1 * 100).toFixed(0)}% of 1h trades are buys.</p>`;
 }
 
 $("#btn-feed-refresh").addEventListener("click", () => loadFeed(true));
-$("#view-feed").addEventListener("click", (e) => {
-  if (e.target.closest("#news-toggle")) {
-    FEED.showAllNews = !FEED.showAllNews;
-    renderFeed();
+
+$("#feed-search").addEventListener("input", (() => {
+  let timer = null;
+  return (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { FEED.query = e.target.value; renderFeed(); }, 120);
+  };
+})());
+
+$("#view-feed").addEventListener("click", async (e) => {
+  const chip = e.target.closest("[data-feed-filter]");
+  if (chip) { FEED.filter = chip.dataset.feedFilter; renderFeed(); return; }
+  const scoreBtn = e.target.closest("[data-feed-score]");
+  if (scoreBtn) { scoreFromFeed(scoreBtn.dataset.feedScore); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
   }
 });
 
@@ -1950,6 +2173,23 @@ function renderLearn() {
       <li>Open FOMO, paste the address into its search, and trade there.</li>
       <li>Come back and tap <b>I bought this</b> — the Positions tab then watches your exits.</li>
     </ol>
+  </section>
+  <section>
+    <h2>Where the Feed comes from — and why no Twitter</h2>
+    <p>The Feed merges ten public, read-only sources: crypto headlines, four meme subreddits,
+       CoinGecko trending searches, GeckoTerminal's trending and brand-new pools (the same live
+       DEX data most meme scanners run on), DexScreener's paid boosts and new profiles, and the
+       Fear &amp; Greed index. Each loads independently — if one is blocked on your network the
+       rest still work, and the status line names what's missing.</p>
+    <p><b>X/Twitter is not read, on purpose.</b> X has no free API, the public Nitter mirrors
+       that used to work have collapsed, and scraping X breaks its terms of service. Rather than
+       ship something that silently breaks or misbehaves, the Feed <b>hands off</b>: the Social
+       panel and every coin's <b>Search X</b> button open X's own live search for that ticker or
+       contract address — the search you'd type yourself, one tap away.</p>
+    <p>Treat all of it as <b>where to look, never what to buy</b>. Hype is how exit liquidity gets
+       recruited: by the time something is loud everywhere, you may be the buyer someone was
+       waiting for. Any coin in the feed has a <b>Score it</b> button that runs it through the
+       same filters and scoring as the scanner — trust that over the noise.</p>
   </section>
   <section>
     <h2>What this app cannot see</h2>
