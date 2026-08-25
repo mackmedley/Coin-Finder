@@ -1,0 +1,49 @@
+name: Deploy website
+
+# Publishes "Coin Finder.html" as a real website via GitHub Pages, so the app
+# runs on any device with a browser (iPad included) at
+#   https://mackmedley.github.io/Coin-Finder/
+#
+# NOTE: on a free GitHub plan, Pages only works while the repository is PUBLIC.
+
+on:
+  push:
+    branches: [claude/meme-coin-trading-fomo-wmajvz]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp "Coin Finder.html" _site/index.html
+          cp icon.png _site/icon.png
+
+      - name: Enable and configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
