@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin Finder</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --line: #2a3441;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #4f9cf9;
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --urgent: #ff6b6b;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--panel);
+  }
+
+  h1 { font-size: 19px; margin: 0; letter-spacing: -0.2px; }
+  h1 span { color: var(--muted); font-weight: 400; }
+
+  .spacer { flex: 1; }
+
+  button {
+    font: inherit;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; }
+  button.small { padding: 5px 10px; font-size: 13px; }
+  button.ghost { background: transparent; }
+
+  nav { display: flex; gap: 4px; padding: 12px 24px 0; }
+  nav button {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--muted);
+    padding: 8px 14px;
+  }
+  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  main { padding: 20px 24px 60px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .notice {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 18px;
+  }
+  .notice.error { border-left-color: var(--bad); }
+  .notice h3 { margin: 0 0 6px; font-size: 15px; }
+  .notice p { margin: 6px 0; color: var(--muted); font-size: 14px; }
+  .notice code {
+    background: var(--panel-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; min-width: 780px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); }
+  th {
+    background: var(--panel);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--panel); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .score {
+    display: inline-block;
+    min-width: 44px;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .score.hi { background: rgba(63,185,80,0.15); color: var(--good); }
+  .score.mid { background: rgba(210,153,34,0.15); color: var(--warn); }
+  .score.lo { background: rgba(139,152,169,0.15); color: var(--muted); }
+
+  .sym { font-weight: 600; }
+  .sym a { color: var(--text); text-decoration: none; }
+  .sym a:hover { color: var(--accent); text-decoration: underline; }
+  .chain { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+
+  .flags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .flag {
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  .pos { color: var(--good); }
+  .neg { color: var(--bad); }
+
+  .verdict {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+  .verdict.HOLD { background: rgba(139,152,169,0.15); color: var(--muted); }
+  .verdict.TRIM { background: rgba(210,153,34,0.18); color: var(--warn); }
+  .verdict.SELL { background: rgba(248,81,73,0.18); color: var(--bad); }
+  .verdict.URGENT { background: var(--bad); color: #fff; }
+
+  .reasons { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .reasons li { margin: 2px 0; }
+
+  .empty { color: var(--muted); text-align: center; padding: 48px 20px; }
+
+  dialog {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+    width: min(460px, 92vw);
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog h2 { margin: 0 0 4px; font-size: 17px; }
+  dialog .hint { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  label { display: block; margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
+  input {
+    width: 100%;
+    font: inherit;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 11px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .settings-grid .full { grid-column: 1 / -1; }
+
+  footer { color: var(--muted); font-size: 12px; padding: 0 24px 30px; }
+
+  .spin { display: inline-block; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Coin&nbsp;Finder <span>— meme coin screener</span></h1>
+  <div class="spacer"></div>
+  <button id="btn-settings" class="ghost small">Settings</button>
+  <button id="btn-scan" class="primary">Scan for coins</button>
+</header>
+
+<nav>
+  <button data-view="find" class="active">Find Coins</button>
+  <button data-view="positions">My Positions <span id="pos-count"></span></button>
+</nav>
+
+<main>
+  <section id="view-find" class="view active">
+    <div id="find-status"></div>
+    <div id="find-results"></div>
+  </section>
+
+  <section id="view-positions" class="view">
+    <div style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="btn-check" class="primary">Check for sell signals</button>
+      <button id="btn-add-manual" class="ghost">Add a position by link</button>
+      <button id="btn-export" class="ghost">Export</button>
+    </div>
+    <div id="pos-status"></div>
+    <div id="pos-results"></div>
+  </section>
+</main>
+
+<footer>
+  This tool only suggests. It never places a trade, holds funds, or touches your wallet —
+  you make every buy and sell yourself in FOMO. Scores are heuristics, not predictions.
+</footer>
+
+<dialog id="dlg-buy">
+  <h2>Track this position</h2>
+  <p class="hint" id="buy-hint"></p>
+  <label for="buy-amount">How much did you put in? (USD)</label>
+  <input id="buy-amount" type="number" min="0" step="any" placeholder="250">
+  <label for="buy-price">Entry price (blank = current price)</label>
+  <input id="buy-price" type="number" min="0" step="any" placeholder="current">
+  <label for="buy-note">Note (optional)</label>
+  <input id="buy-note" type="text" placeholder="">
+  <div class="row">
+    <button data-close="dlg-buy" class="ghost">Cancel</button>
+    <button id="buy-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-manual">
+  <h2>Add a position</h2>
+  <p class="hint">Paste the DexScreener link for the coin you bought.</p>
+  <label for="man-link">DexScreener link</label>
+  <input id="man-link" type="text" placeholder="https://dexscreener.com/solana/...">
+  <label for="man-amount">How much did you put in? (USD)</label>
+  <input id="man-amount" type="number" min="0" step="any" placeholder="250">
+  <label for="man-price">Entry price (blank = current price)</label>
+  <input id="man-price" type="number" min="0" step="any" placeholder="current">
+  <div class="row">
+    <button data-close="dlg-manual" class="ghost">Cancel</button>
+    <button id="man-save" class="primary">Add</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-settings">
+  <h2>Settings</h2>
+  <p class="hint">Thresholds the scanner and sell rules use. Stored in this browser only.</p>
+  <div class="settings-grid">
+    <div class="full">
+      <label for="set-chains">Chains (comma separated)</label>
+      <input id="set-chains" type="text">
+    </div>
+    <div>
+      <label for="set-minliq">Min liquidity ($)</label>
+      <input id="set-minliq" type="number" min="0" step="any">
+    </div>
+    <div>
+      <label for="set-minvol">Min 24h volume ($)</label>
+      <input id="set-minvol" type="number" min="0" step="any">
+    </div>
+    <div>
+      <label for="set-tp">Take profit (%)</label>
+      <input id="set-tp" type="number" step="any">
+    </div>
+    <div>
+      <label for="set-sl">Stop loss (%)</label>
+      <input id="set-sl" type="number" step="any">
+    </div>
+    <div>
+      <label for="set-trail">Trailing stop (%)</label>
+      <input id="set-trail" type="number" step="any">
+    </div>
+    <div>
+      <label for="set-liqdrop">Liquidity drop alert (%)</label>
+      <input id="set-liqdrop" type="number" step="any">
+    </div>
+  </div>
+  <div class="row">
+    <button id="set-reset" class="ghost">Reset to defaults</button>
+    <button data-close="dlg-settings" class="ghost">Cancel</button>
+    <button id="set-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ * Configuration
+ *
+ * Mirrors config/default.yaml from the Python version. Kept in one
+ * object so the scoring code below reads the same names as scoring.py.
+ * ------------------------------------------------------------------ */
+
+const DEFAULTS = {
+  discovery: {
+    chains: ["solana", "base", "ethereum", "bsc"],
+    search_terms: ["pump", "meme"],
+    max_candidates: 150,
+  },
+  filters: {
+    min_liquidity_usd: 15000,
+    min_volume_h24_usd: 20000,
+    min_age_minutes: 30,
+    max_age_days: 45,
+    max_fdv_to_liquidity_ratio: 60,
+    min_buy_ratio_h1: 0.45,
+  },
+  scoring: {
+    weights: { liquidity: 15, turnover: 20, momentum: 25, buy_pressure: 20, age_fit: 10, safety: 10 },
+    liquidity_saturation_usd: 300000,
+    turnover_saturation_ratio: 4.0,
+    momentum_late_pump_threshold_pct: 150,
+    age_fit_sweet_spot_hours: [2, 240],
+  },
+  sell_rules: {
+    take_profit_pct: 60,
+    stop_loss_pct: -25,
+    trailing_stop_pct: -30,
+    liquidity_drop_pct: -40,
+    momentum_decay_volume_ratio: 0.15,
+    momentum_decay_min_hold_hours: 2,
+  },
+};
+
+const STORE_CONFIG = "coinfinder.config";
+const STORE_POSITIONS = "coinfinder.positions";
+
+/** localStorage can throw outright (private mode, blocked site data). */
+function readStore(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function writeStore(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function deepMerge(base, override) {
+  const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+  for (const [k, v] of Object.entries(override || {})) {
+    if (v && typeof v === "object" && !Array.isArray(v) && base[k] && typeof base[k] === "object") {
+      out[k] = deepMerge(base[k], v);
+    } else if (v !== undefined) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+let CONFIG = deepMerge(DEFAULTS, readStore(STORE_CONFIG, {}));
+
+/* ------------------------------------------------------------------ *
+ * Data provider (DexScreener)
+ * ------------------------------------------------------------------ */
+
+const API = "https://api.dexscreener.com";
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
+  return res.json();
+}
+
+/** Endpoints return either a bare array or {pairs:[...]} — accept both. */
+function pairsFrom(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.pairs)) return payload.pairs;
+  if (payload && payload.pair) return [payload.pair];
+  return [];
+}
+
+async function fetchBoostedTokens() {
+  const out = [];
+  for (const path of ["/token-boosts/top/v1", "/token-boosts/latest/v1"]) {
+    try {
+      const payload = await getJson(API + path);
+      if (Array.isArray(payload)) out.push(...payload);
+    } catch (err) {
+      /* One feed failing shouldn't sink the whole scan. */
+    }
+  }
+  return out;
+}
+
+async function discover() {
+  const chains = new Set(CONFIG.discovery.chains.map((c) => String(c).toLowerCase()));
+  const byKey = new Map();
+  const boostByToken = new Map();
+
+  const boosted = await fetchBoostedTokens();
+  const grouped = new Map();
+  for (const entry of boosted) {
+    const chain = String(entry.chainId || "").toLowerCase();
+    const token = entry.tokenAddress;
+    if (!chains.has(chain) || !token) continue;
+    if (!grouped.has(chain)) grouped.set(chain, new Set());
+    grouped.get(chain).add(token);
+    boostByToken.set(token, Math.max(boostByToken.get(token) || 0, Number(entry.totalAmount) || 0));
+  }
+
+  // Each request catches its own failure so one bad feed can't sink the scan.
+  // But if EVERY request fails the cause is the connection, not the data — and
+  // that needs a different message, so failures are counted rather than hidden.
+  let failed = 0;
+  const attempt = (url) => getJson(url).catch(() => { failed++; return null; });
+
+  const requests = [];
+  for (const [chain, tokens] of grouped) {
+    // The batch endpoint takes up to 30 comma-separated addresses.
+    const list = [...tokens];
+    for (let i = 0; i < list.length; i += 30) {
+      requests.push(attempt(`${API}/tokens/v1/${chain}/${list.slice(i, i + 30).join(",")}`));
+    }
+  }
+  for (const term of CONFIG.discovery.search_terms) {
+    requests.push(attempt(`${API}/latest/dex/search?q=${encodeURIComponent(term)}`));
+  }
+
+  const results = await Promise.all(requests);
+  if (requests.length > 0 && failed === requests.length) {
+    throw new Error(`all ${failed} requests to the data provider failed`);
+  }
+
+  for (const payload of results) {
+    for (const pair of pairsFrom(payload)) {
+      const chain = String(pair.chainId || "").toLowerCase();
+      if (!chains.has(chain) || !pair.pairAddress) continue;
+      const key = chain + ":" + pair.pairAddress;
+      if (byKey.has(key)) continue;
+      const candidate = toCandidate(pair);
+      candidate.boost_amount = boostByToken.get(candidate.token_address) || 0;
+      byKey.set(key, candidate);
+    }
+  }
+
+  const all = [...byKey.values()];
+  all.sort((a, b) => b.volume_h24 - a.volume_h24);
+  return all.slice(0, CONFIG.discovery.max_candidates);
+}
+
+async function fetchPair(chain, pairAddress) {
+  try {
+    const payload = await getJson(`${API}/latest/dex/pairs/${chain}/${pairAddress}`);
+    const pairs = pairsFrom(payload);
+    return pairs.length ? toCandidate(pairs[0]) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Normalization — the JS twin of models.Candidate
+ * ------------------------------------------------------------------ */
+
+function num(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function dig(obj, ...keys) {
+  let cur = obj;
+  for (const k of keys) {
+    if (!cur || typeof cur !== "object") return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+
+function toCandidate(pair) {
+  const base = pair.baseToken || {};
+  const info = pair.info || {};
+  const c = {
+    chain: String(pair.chainId || "unknown"),
+    dex: String(pair.dexId || "unknown"),
+    pair_address: String(pair.pairAddress || ""),
+    token_address: String(base.address || ""),
+    symbol: String(base.symbol || "?"),
+    name: String(base.name || "?"),
+    url: String(pair.url || ""),
+    price_usd: num(pair.priceUsd),
+    liquidity_usd: num(dig(pair, "liquidity", "usd")),
+    fdv: num(pair.fdv),
+    volume_h24: num(dig(pair, "volume", "h24")),
+    volume_h1: num(dig(pair, "volume", "h1")),
+    price_change_h1: num(dig(pair, "priceChange", "h1")),
+    price_change_h6: num(dig(pair, "priceChange", "h6")),
+    price_change_h24: num(dig(pair, "priceChange", "h24")),
+    buys_h1: Math.trunc(num(dig(pair, "txns", "h1", "buys"))),
+    sells_h1: Math.trunc(num(dig(pair, "txns", "h1", "sells"))),
+    buys_h24: Math.trunc(num(dig(pair, "txns", "h24", "buys"))),
+    sells_h24: Math.trunc(num(dig(pair, "txns", "h24", "sells"))),
+    pair_created_at_ms: Math.trunc(num(pair.pairCreatedAt)),
+    socials: Array.isArray(info.socials) ? info.socials : [],
+    websites: Array.isArray(info.websites) ? info.websites : [],
+    boost_amount: 0,
+  };
+
+  c.age_minutes = c.pair_created_at_ms > 0 ? Math.max(0, (Date.now() - c.pair_created_at_ms) / 60000) : 0;
+  c.age_hours = c.age_minutes / 60;
+  const h1 = c.buys_h1 + c.sells_h1;
+  c.buy_ratio_h1 = h1 === 0 ? 0.5 : c.buys_h1 / h1;
+  c.turnover_ratio = c.liquidity_usd <= 0 ? 0 : c.volume_h24 / c.liquidity_usd;
+  c.fdv_to_liquidity = c.liquidity_usd <= 0 ? 0 : c.fdv / c.liquidity_usd;
+  return c;
+}
+
+/* ------------------------------------------------------------------ *
+ * Filters and scoring — the JS twin of scoring.py
+ * ------------------------------------------------------------------ */
+
+const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+const money = (n) => "$" + Math.round(n).toLocaleString();
+
+function applyFilters(c) {
+  const f = CONFIG.filters;
+  const reasons = [];
+
+  if (c.liquidity_usd < f.min_liquidity_usd)
+    reasons.push(`liquidity ${money(c.liquidity_usd)} < ${money(f.min_liquidity_usd)}`);
+  if (c.volume_h24 < f.min_volume_h24_usd)
+    reasons.push(`24h volume ${money(c.volume_h24)} < ${money(f.min_volume_h24_usd)}`);
+
+  // Age 0 means the provider omitted pairCreatedAt: unknown, not brand new.
+  if (c.pair_created_at_ms > 0) {
+    if (c.age_minutes < f.min_age_minutes)
+      reasons.push(`age ${c.age_minutes.toFixed(0)}m < ${f.min_age_minutes}m`);
+    if (c.age_hours > f.max_age_days * 24)
+      reasons.push(`age ${(c.age_hours / 24).toFixed(1)}d > ${f.max_age_days}d`);
+  }
+
+  if (f.max_fdv_to_liquidity_ratio > 0 && c.fdv > 0 && c.fdv_to_liquidity > f.max_fdv_to_liquidity_ratio)
+    reasons.push(`FDV/liquidity ${c.fdv_to_liquidity.toFixed(0)}x > ${f.max_fdv_to_liquidity_ratio}x`);
+
+  if (c.buys_h1 + c.sells_h1 > 0 && c.buy_ratio_h1 < f.min_buy_ratio_h1)
+    reasons.push(`1h buy ratio ${(c.buy_ratio_h1 * 100).toFixed(0)}% < ${(f.min_buy_ratio_h1 * 100).toFixed(0)}%`);
+
+  return reasons;
+}
+
+function safetyComponent(c) {
+  let score = 1.0;
+  const flags = [];
+  const maxRatio = CONFIG.filters.max_fdv_to_liquidity_ratio;
+
+  if (c.fdv > 0 && maxRatio > 0) {
+    const overhang = c.fdv_to_liquidity / maxRatio;
+    if (overhang > 0.5) {
+      score -= clamp((overhang - 0.5) / 0.5) * 0.35;
+      flags.push(`FDV ${c.fdv_to_liquidity.toFixed(0)}x liquidity`);
+    }
+  }
+  if (c.socials.length === 0 && c.websites.length === 0) {
+    score -= 0.25;
+    flags.push("no socials/website");
+  }
+  if (c.liquidity_usd < 30000) {
+    score -= 0.20;
+    flags.push("thin liquidity");
+  }
+  const h24 = c.buys_h24 + c.sells_h24;
+  if (h24 >= 50 && c.buys_h24 / h24 < 0.45) {
+    score -= 0.20;
+    flags.push("24h net selling");
+  }
+  if (c.volume_h1 > 0 && c.volume_h24 > 0 && c.volume_h1 < (c.volume_h24 / 24) * 0.25) {
+    score -= 0.15;
+    flags.push("volume fading");
+  }
+  return [clamp(score), flags];
+}
+
+function scoreCandidate(c) {
+  const s = CONFIG.scoring;
+
+  const liquidity = s.liquidity_saturation_usd <= 0
+    ? 0
+    : clamp(Math.sqrt(c.liquidity_usd / s.liquidity_saturation_usd));
+
+  const turnover = s.turnover_saturation_ratio <= 0
+    ? 0
+    : clamp(c.turnover_ratio / s.turnover_saturation_ratio);
+
+  const late = s.momentum_late_pump_threshold_pct;
+  const blended = 0.6 * c.price_change_h1 + 0.4 * c.price_change_h6;
+  let momentum;
+  if (late <= 0) momentum = 0;
+  else if (blended <= -50) momentum = 0;
+  else if (blended < 0) momentum = 0.2 * (1 + blended / 50);
+  else if (blended <= late) momentum = 0.2 + 0.8 * (blended / late);
+  else momentum = Math.max(0.25, 1.0 - (blended - late) / (late * 3));
+
+  const totalH1 = c.buys_h1 + c.sells_h1;
+  const buy_pressure = totalH1 === 0
+    ? 0
+    : clamp((c.buy_ratio_h1 - 0.35) / 0.40) * clamp(totalH1 / 50);
+
+  const [lo, hi] = s.age_fit_sweet_spot_hours.map(Number);
+  let age_fit;
+  if (c.pair_created_at_ms <= 0) age_fit = 0.5;
+  else if (c.age_hours >= lo && c.age_hours <= hi) age_fit = 1.0;
+  else if (c.age_hours < lo) age_fit = clamp(c.age_hours / lo) * 0.7;
+  else age_fit = Math.max(0, 1.0 - (c.age_hours - hi) / (hi * 2));
+
+  const [safety, safetyFlags] = safetyComponent(c);
+
+  const components = { liquidity, turnover, momentum, buy_pressure, age_fit, safety };
+  const weights = CONFIG.scoring.weights;
+  const totalWeight = Object.values(weights).reduce((a, b) => a + Number(b), 0);
+  const weighted = Object.entries(components)
+    .reduce((sum, [name, value]) => sum + value * Number(weights[name] || 0), 0);
+
+  c.score = totalWeight > 0 ? Math.round((100 * weighted / totalWeight) * 10) / 10 : 0;
+  c.score_breakdown = components;
+
+  const flags = safetyFlags.slice();
+  if (c.price_change_h1 > late) flags.push(`already pumped ${c.price_change_h1.toFixed(0)}% in 1h`);
+  if (c.boost_amount > 0) flags.push(`paid boost ${c.boost_amount.toFixed(0)}`);
+  c.flags = flags;
+  return c;
+}
+
+function rank(candidates) {
+  const passing = [];
+  const rejected = [];
+  for (const c of candidates) {
+    const reasons = applyFilters(c);
+    if (reasons.length) {
+      c.reject_reasons = reasons;
+      rejected.push(c);
+    } else {
+      passing.push(scoreCandidate(c));
+    }
+  }
+  passing.sort((a, b) => b.score - a.score);
+  return { passing, rejected };
+}
+
+/* ------------------------------------------------------------------ *
+ * Sell rules — the JS twin of sell.py
+ * ------------------------------------------------------------------ */
+
+const SEVERITY = { HOLD: 0, TRIM: 1, SELL: 2, "URGENT SELL": 3 };
+
+function pctChange(current, reference) {
+  return reference <= 0 ? 0 : ((current - reference) / reference) * 100;
+}
+
+function evaluatePosition(position, current) {
+  if (!current || current.price_usd <= 0) {
+    return {
+      position,
+      verdict: "HOLD",
+      reasons: ["no live price available — could not evaluate, check manually"],
+      price_usd: 0, pnl_pct: 0, pnl_usd: 0,
+      drawdown_from_peak_pct: 0, liquidity_change_pct: 0, stale: true,
+    };
+  }
+
+  const r = CONFIG.sell_rules;
+  const price = current.price_usd;
+  const pnlPct = pctChange(price, position.entry_price_usd);
+  const pnlUsd = (position.amount_usd * pnlPct) / 100;
+  const peak = Math.max(position.peak_price_usd, price);
+  const drawdown = pctChange(price, peak);
+  const liquidityChange = pctChange(current.liquidity_usd, position.entry_liquidity_usd);
+  const holdHours = Math.max(0, (Date.now() / 1000 - position.opened_at) / 3600);
+
+  let verdict = "HOLD";
+  const reasons = [];
+  const escalate = (v, reason) => {
+    reasons.push(reason);
+    if (SEVERITY[v] > SEVERITY[verdict]) verdict = v;
+  };
+
+  if (position.entry_liquidity_usd > 0 && liquidityChange <= r.liquidity_drop_pct) {
+    escalate("URGENT SELL",
+      `liquidity down ${liquidityChange.toFixed(0)}% since entry ` +
+      `(${money(position.entry_liquidity_usd)} → ${money(current.liquidity_usd)}) — possible rug`);
+  }
+  if (pnlPct <= r.stop_loss_pct) {
+    escalate("SELL", `stop loss hit: ${pnlPct.toFixed(1)}% (limit ${r.stop_loss_pct}%)`);
+  }
+  if (pnlPct >= r.take_profit_pct) {
+    escalate("SELL", `take profit hit: +${pnlPct.toFixed(1)}% (target +${r.take_profit_pct}%)`);
+  }
+  if (drawdown <= r.trailing_stop_pct && price < peak) {
+    escalate("SELL", `trailing stop: down ${drawdown.toFixed(0)}% from peak (limit ${r.trailing_stop_pct}%)`);
+  }
+  if (holdHours >= r.momentum_decay_min_hold_hours && current.volume_h24 > 0) {
+    const hourly = current.volume_h24 / 24;
+    if (hourly > 0 && current.volume_h1 < hourly * r.momentum_decay_volume_ratio) {
+      escalate("TRIM",
+        `volume collapsing: 1h ${money(current.volume_h1)} vs ${money(hourly)}/h average — interest is gone`);
+    }
+  }
+  const totalH1 = current.buys_h1 + current.sells_h1;
+  if (totalH1 >= 20 && current.buy_ratio_h1 < 0.35) {
+    escalate("TRIM", `sellers taking over: only ${(current.buy_ratio_h1 * 100).toFixed(0)}% of 1h trades are buys`);
+  }
+
+  if (!reasons.length) reasons.push(`holding at ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%, no exit rule triggered`);
+
+  return {
+    position, verdict, reasons,
+    price_usd: price, pnl_pct: pnlPct, pnl_usd: pnlUsd,
+    drawdown_from_peak_pct: drawdown, liquidity_change_pct: liquidityChange,
+    stale: false, peak,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Positions storage
+ * ------------------------------------------------------------------ */
+
+function loadPositions() {
+  const raw = readStore(STORE_POSITIONS, {});
+  return raw && typeof raw === "object" ? raw : {};
+}
+
+function savePositions(positions) {
+  if (!writeStore(STORE_POSITIONS, positions)) {
+    alert("Couldn't save. Your browser is blocking site data for local files — " +
+          "positions won't persist after you close this page.");
+  }
+  renderPositionCount();
+}
+
+function addPosition(candidate, amountUsd, entryPrice, note) {
+  const positions = loadPositions();
+  const key = candidate.chain + ":" + candidate.pair_address;
+  const price = entryPrice > 0 ? entryPrice : candidate.price_usd;
+  positions[key] = {
+    key,
+    chain: candidate.chain,
+    pair_address: candidate.pair_address,
+    symbol: candidate.symbol,
+    entry_price_usd: price,
+    amount_usd: amountUsd,
+    entry_liquidity_usd: candidate.liquidity_usd,
+    opened_at: Date.now() / 1000,
+    peak_price_usd: price,
+    note: note || "",
+  };
+  savePositions(positions);
+}
+
+/* ------------------------------------------------------------------ *
+ * Rendering
+ * ------------------------------------------------------------------ */
+
+const $ = (sel) => document.querySelector(sel);
+let lastResults = [];
+
+function fmtPrice(p) {
+  if (!p) return "—";
+  if (p >= 1) return "$" + p.toFixed(4);
+  if (p >= 0.0001) return "$" + p.toFixed(6);
+  return "$" + p.toExponential(2);
+}
+
+function fmtCompact(n) {
+  if (!n) return "—";
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return "$" + (n / 1e3).toFixed(0) + "K";
+  return "$" + n.toFixed(0);
+}
+
+function fmtAge(hours) {
+  if (!hours) return "?";
+  if (hours < 1) return Math.round(hours * 60) + "m";
+  if (hours < 48) return hours.toFixed(1) + "h";
+  return (hours / 24).toFixed(1) + "d";
+}
+
+function fmtPct(p) {
+  const cls = p >= 0 ? "pos" : "neg";
+  return `<span class="${cls}">${p >= 0 ? "+" : ""}${p.toFixed(1)}%</span>`;
+}
+
+function scoreClass(score) {
+  if (score >= 65) return "hi";
+  if (score >= 45) return "mid";
+  return "lo";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+function renderResults(passing, rejectedCount) {
+  lastResults = passing;
+  if (!passing.length) {
+    $("#find-results").innerHTML =
+      `<div class="empty">Nothing passed the filters.<br>` +
+      `${rejectedCount} candidate${rejectedCount === 1 ? "" : "s"} were checked and rejected. ` +
+      `Try loosening the thresholds in Settings.</div>`;
+    return;
+  }
+
+  const rows = passing.map((c, i) => `
+    <tr>
+      <td class="num"><span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span></td>
+      <td>
+        <div class="sym"><a href="${escapeHtml(c.url)}" target="_blank" rel="noopener">${escapeHtml(c.symbol)}</a></div>
+        <div class="chain">${escapeHtml(c.chain)}</div>
+        ${c.flags.length ? `<div class="flags">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
+      </td>
+      <td class="num">${fmtPrice(c.price_usd)}</td>
+      <td class="num">${fmtPct(c.price_change_h1)}</td>
+      <td class="num">${fmtCompact(c.liquidity_usd)}</td>
+      <td class="num">${fmtCompact(c.volume_h24)}</td>
+      <td class="num">${fmtAge(c.age_hours)}</td>
+      <td><button class="small" data-buy="${i}">I bought this</button></td>
+    </tr>`).join("");
+
+  $("#find-results").innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Score</th><th>Coin</th><th style="text-align:right">Price</th>
+        <th style="text-align:right">1h</th><th style="text-align:right">Liquidity</th>
+        <th style="text-align:right">24h Vol</th><th style="text-align:right">Age</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function renderSignals(signals) {
+  if (!signals.length) {
+    $("#pos-results").innerHTML =
+      `<div class="empty">No positions tracked yet.<br>` +
+      `Scan for coins and press "I bought this" after you buy one in FOMO.</div>`;
+    return;
+  }
+
+  const order = { "URGENT SELL": 0, SELL: 1, TRIM: 2, HOLD: 3 };
+  signals.sort((a, b) => order[a.verdict] - order[b.verdict]);
+
+  const rows = signals.map((s) => {
+    const p = s.position;
+    const cls = s.verdict === "URGENT SELL" ? "URGENT" : s.verdict;
+    return `
+      <tr>
+        <td><span class="verdict ${cls}">${s.verdict}</span></td>
+        <td>
+          <div class="sym">${escapeHtml(p.symbol)}</div>
+          <div class="chain">${escapeHtml(p.chain)}</div>
+          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+        </td>
+        <td class="num">${fmtPrice(p.entry_price_usd)}</td>
+        <td class="num">${fmtPrice(s.price_usd)}</td>
+        <td class="num">${s.stale ? "—" : fmtPct(s.pnl_pct)}</td>
+        <td class="num">${s.stale ? "—" : `<span class="${s.pnl_usd >= 0 ? "pos" : "neg"}">${s.pnl_usd >= 0 ? "+" : "-"}$${Math.abs(s.pnl_usd).toFixed(2)}</span>`}</td>
+        <td><button class="small ghost" data-remove="${escapeHtml(p.key)}">Remove</button></td>
+      </tr>`;
+  }).join("");
+
+  $("#pos-results").innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Verdict</th><th>Coin &amp; why</th><th style="text-align:right">Entry</th>
+        <th style="text-align:right">Now</th><th style="text-align:right">P&amp;L</th>
+        <th style="text-align:right">P&amp;L $</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function renderPositionCount() {
+  const n = Object.keys(loadPositions()).length;
+  $("#pos-count").textContent = n ? `(${n})` : "";
+}
+
+function setStatus(target, html) {
+  $(target).innerHTML = html || "";
+}
+
+function networkErrorNotice(err) {
+  return `
+    <div class="notice error">
+      <h3>Couldn't reach the price data</h3>
+      <p>The most likely cause is that your browser blocked the request to
+         <code>api.dexscreener.com</code> — some browsers refuse cross-site
+         requests from a file opened directly off your disk.</p>
+      <p><strong>Two things to try, in order:</strong></p>
+      <p>1. Check you're online, then press Scan again.</p>
+      <p>2. If it keeps failing, use the Python version instead — double-click
+         <code>Coin Finder.command</code> (Mac) or <code>Coin Finder.bat</code> (Windows)
+         in the same folder. It fetches the same data without the browser restriction.</p>
+      <p style="opacity:0.7">Technical detail: ${escapeHtml(err.message || String(err))}</p>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+async function doScan() {
+  const btn = $("#btn-scan");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">◜</span> Scanning…';
+  setStatus("#find-status", "");
+  $("#find-results").innerHTML = "";
+
+  try {
+    const candidates = await discover();
+    if (!candidates.length) {
+      setStatus("#find-status", `
+        <div class="notice">
+          <h3>No pairs came back</h3>
+          <p>The provider returned nothing for these chains. This can happen briefly;
+             try again in a minute, or widen the chain list in Settings.</p>
+        </div>`);
+      return;
+    }
+    const { passing, rejected } = rank(candidates);
+    setStatus("#find-status", `
+      <div class="notice">
+        <p style="margin:0">Checked <strong>${candidates.length}</strong> pairs ·
+        <strong>${passing.length}</strong> passed the safety filters ·
+        <strong>${rejected.length}</strong> rejected ·
+        scanned ${new Date().toLocaleTimeString()}</p>
+      </div>`);
+    renderResults(passing, rejected.length);
+  } catch (err) {
+    setStatus("#find-status", networkErrorNotice(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Scan for coins";
+  }
+}
+
+async function doCheck() {
+  const positions = loadPositions();
+  const keys = Object.keys(positions);
+  if (!keys.length) {
+    renderSignals([]);
+    return;
+  }
+
+  const btn = $("#btn-check");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">◜</span> Checking…';
+  setStatus("#pos-status", "");
+
+  try {
+    const signals = [];
+    let failures = 0;
+    for (const key of keys) {
+      const p = positions[key];
+      const current = await fetchPair(p.chain, p.pair_address);
+      if (!current) failures++;
+      const signal = evaluatePosition(p, current);
+      // Ratchet the peak so the trailing stop keeps working between checks.
+      if (signal.peak && signal.peak > p.peak_price_usd) {
+        positions[key].peak_price_usd = signal.peak;
+      }
+      signals.push(signal);
+    }
+    savePositions(positions);
+    const actionable = signals.filter((s) => s.verdict !== "HOLD").length;
+    setStatus("#pos-status", `
+      <div class="notice">
+        <p style="margin:0">${signals.length} position${signals.length === 1 ? "" : "s"} ·
+        <strong>${actionable}</strong> with an exit signal ·
+        checked ${new Date().toLocaleTimeString()}
+        ${failures ? ` · <span class="neg">${failures} couldn't be priced</span>` : ""}</p>
+      </div>`);
+    renderSignals(signals);
+  } catch (err) {
+    setStatus("#pos-status", networkErrorNotice(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check for sell signals";
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Wiring
+ * ------------------------------------------------------------------ */
+
+document.querySelectorAll("nav button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    btn.classList.add("active");
+    $("#view-" + btn.dataset.view).classList.add("active");
+    if (btn.dataset.view === "positions" && !$("#pos-results").innerHTML) {
+      renderSignals([]);
+    }
+  });
+});
+
+document.querySelectorAll("[data-close]").forEach((btn) => {
+  btn.addEventListener("click", () => $("#" + btn.dataset.close).close());
+});
+
+$("#btn-scan").addEventListener("click", doScan);
+$("#btn-check").addEventListener("click", doCheck);
+
+let pendingBuy = null;
+
+$("#find-results").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-buy]");
+  if (!btn) return;
+  pendingBuy = lastResults[Number(btn.dataset.buy)];
+  $("#buy-hint").textContent =
+    `${pendingBuy.symbol} on ${pendingBuy.chain} — current price ${fmtPrice(pendingBuy.price_usd)}`;
+  $("#buy-amount").value = "";
+  $("#buy-price").value = "";
+  $("#buy-note").value = "";
+  $("#dlg-buy").showModal();
+});
+
+$("#buy-save").addEventListener("click", () => {
+  const amount = Number($("#buy-amount").value);
+  if (!(amount > 0)) {
+    alert("Enter how much you put in, in dollars.");
+    return;
+  }
+  addPosition(pendingBuy, amount, Number($("#buy-price").value) || 0, $("#buy-note").value);
+  $("#dlg-buy").close();
+  alert(`Tracking ${pendingBuy.symbol}. Open "My Positions" and press "Check for sell signals" any time.`);
+});
+
+$("#pos-results").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-remove]");
+  if (!btn) return;
+  const positions = loadPositions();
+  const key = btn.dataset.remove;
+  if (positions[key] && confirm(`Stop tracking ${positions[key].symbol}?`)) {
+    delete positions[key];
+    savePositions(positions);
+    doCheck();
+  }
+});
+
+$("#btn-add-manual").addEventListener("click", () => {
+  $("#man-link").value = "";
+  $("#man-amount").value = "";
+  $("#man-price").value = "";
+  $("#dlg-manual").showModal();
+});
+
+$("#man-save").addEventListener("click", async () => {
+  const match = /dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i.exec($("#man-link").value.trim());
+  if (!match) {
+    alert("That doesn't look like a DexScreener link.\nExpected something like:\nhttps://dexscreener.com/solana/ABC123...");
+    return;
+  }
+  const amount = Number($("#man-amount").value);
+  if (!(amount > 0)) {
+    alert("Enter how much you put in, in dollars.");
+    return;
+  }
+  const btn = $("#man-save");
+  btn.disabled = true;
+  btn.textContent = "Looking up…";
+  const candidate = await fetchPair(match[1].toLowerCase(), match[2]);
+  btn.disabled = false;
+  btn.textContent = "Add";
+  if (!candidate) {
+    alert("Couldn't find that pair. Check the link, or that you're online.");
+    return;
+  }
+  addPosition(candidate, amount, Number($("#man-price").value) || 0, "");
+  $("#dlg-manual").close();
+  doCheck();
+});
+
+$("#btn-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(loadPositions(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "positions.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+function fillSettings() {
+  $("#set-chains").value = CONFIG.discovery.chains.join(", ");
+  $("#set-minliq").value = CONFIG.filters.min_liquidity_usd;
+  $("#set-minvol").value = CONFIG.filters.min_volume_h24_usd;
+  $("#set-tp").value = CONFIG.sell_rules.take_profit_pct;
+  $("#set-sl").value = CONFIG.sell_rules.stop_loss_pct;
+  $("#set-trail").value = CONFIG.sell_rules.trailing_stop_pct;
+  $("#set-liqdrop").value = CONFIG.sell_rules.liquidity_drop_pct;
+}
+
+$("#btn-settings").addEventListener("click", () => {
+  fillSettings();
+  $("#dlg-settings").showModal();
+});
+
+$("#set-save").addEventListener("click", () => {
+  const chains = $("#set-chains").value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!chains.length) {
+    alert("Enter at least one chain, e.g. solana");
+    return;
+  }
+  CONFIG.discovery.chains = chains;
+  CONFIG.filters.min_liquidity_usd = Number($("#set-minliq").value) || 0;
+  CONFIG.filters.min_volume_h24_usd = Number($("#set-minvol").value) || 0;
+  CONFIG.sell_rules.take_profit_pct = Number($("#set-tp").value);
+  CONFIG.sell_rules.stop_loss_pct = Number($("#set-sl").value);
+  CONFIG.sell_rules.trailing_stop_pct = Number($("#set-trail").value);
+  CONFIG.sell_rules.liquidity_drop_pct = Number($("#set-liqdrop").value);
+  writeStore(STORE_CONFIG, CONFIG);
+  $("#dlg-settings").close();
+});
+
+$("#set-reset").addEventListener("click", () => {
+  CONFIG = JSON.parse(JSON.stringify(DEFAULTS));
+  writeStore(STORE_CONFIG, CONFIG);
+  fillSettings();
+});
+
+renderPositionCount();
+renderSignals([]);
+</script>
+</body>
+</html>

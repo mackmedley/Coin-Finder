@@ -11,7 +11,23 @@ It **places no orders and holds no funds**. There is no wallet, no private key, 
 
 ---
 
-## Easiest way to run it
+## Easiest way to run it — nothing to install
+
+Double-click **`Coin Finder.html`**. It opens in your browser and works with no
+Python, no installer, and no setup. Positions are saved in that browser.
+
+It runs the same rules as the Python version: `Coin Finder.html` carries a
+JavaScript port of `scoring.py` and `sell.py`, and `tests/test_js_parity.py`
+scores a spread of payloads through both engines and fails if any score,
+component, flag, or rejection reason differs.
+
+One caveat: some browsers refuse cross-site requests from a file opened off
+your disk. If the page says it can't reach the price data, use the Python
+version below — it has no such restriction.
+
+---
+
+## Running the Python version
 
 Double-click **`Coin Finder.command`** (macOS/Linux) or **`Coin Finder.bat`** (Windows).
 
@@ -171,7 +187,11 @@ The provider is isolated behind `coinfinder/datasources/`, so adding Birdeye, Ge
 python3 -m pytest tests -q
 ```
 
-42 tests covering filters, every scoring component, all sell rules, position persistence, config validation, provider response-shape handling, and menu input parsing. They run against synthetic fixtures and make no network calls.
+43 tests covering filters, every scoring component, all sell rules, position
+persistence, config validation, provider response-shape handling, menu input
+parsing, and Python/JavaScript scoring parity. They run against synthetic
+fixtures and make no network calls. The parity test skips if Node isn't
+installed.
 
 ---
 
