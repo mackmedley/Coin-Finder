@@ -499,6 +499,7 @@
   <section id="view-find" class="view active">
     <div class="toolbar">
       <input id="search" class="search" type="search" placeholder="Filter coins…  ( / )">
+      <button id="btn-lookup" class="ghost">Look up any coin</button>
       <div class="chips" id="chain-chips"></div>
       <div class="spacer"></div>
       <label class="switch"><input type="checkbox" id="auto-scan">Auto-rescan 2&nbsp;min</label>
@@ -596,6 +597,19 @@
   </div>
 </dialog>
 
+<dialog id="dlg-lookup">
+  <h2>Look up any coin</h2>
+  <p class="hint">Paste a contract address, a ticker, or a DexScreener link — straight from FOMO.
+     This searches every chain, not just your scan.</p>
+  <label for="lookup-q">Address, ticker, or link</label>
+  <input id="lookup-q" type="text" placeholder="e.g. BONK, or So11111…">
+  <div id="lookup-results" style="margin-top:14px; max-height:46vh; overflow-y:auto"></div>
+  <div class="dlg-row">
+    <button data-close class="ghost">Close</button>
+    <button id="lookup-go" class="primary">Search</button>
+  </div>
+</dialog>
+
 <dialog id="dlg-explain">
   <h2 id="explain-term"></h2>
   <p class="hint" id="explain-text" style="margin-top:10px"></p>
@@ -650,9 +664,11 @@
 
 const DEFAULTS = {
   discovery: {
-    chains: ["solana", "base", "ethereum", "bsc"],
-    search_terms: ["pump", "meme"],
-    max_candidates: 150,
+    // Chains FOMO trades on, plus the other chains meme coins launch on.
+    chains: ["solana", "base", "ethereum", "bsc", "monad", "arbitrum", "polygon",
+             "avalanche", "sui", "ton", "blast", "hyperliquid", "abstract", "tron"],
+    search_terms: ["pump", "meme", "dog", "cat", "pepe", "moon", "elon", "trump", "inu", "bonk"],
+    max_candidates: 600,
   },
   filters: {
     min_liquidity_usd: 15000,
@@ -764,6 +780,44 @@ async function fetchBoostedTokens() {
   return out;
 }
 
+/* GeckoTerminal names some chains differently from DexScreener. Discovery
+   happens on GeckoTerminal (100+ chains, no key); scoring data always comes
+   back from DexScreener, so every candidate is measured the same way. */
+const GECKO_TO_DEX = {
+  "eth": "ethereum", "bsc": "bsc", "solana": "solana", "base": "base",
+  "monad": "monad", "polygon_pos": "polygon", "arbitrum": "arbitrum",
+  "avax": "avalanche", "ton": "ton", "sui-network": "sui", "blast": "blast",
+  "abstract": "abstract", "tron": "tron", "hyperevm": "hyperliquid",
+  "berachain": "berachain", "unichain": "unichain",
+};
+
+/** Pool addresses from GeckoTerminal's trending + brand-new feeds, all chains. */
+async function discoverPools(allowedChains) {
+  const pages = [
+    `${GECKO}/networks/trending_pools?page=1`,
+    `${GECKO}/networks/trending_pools?page=2`,
+    `${GECKO}/networks/new_pools?page=1`,
+    `${GECKO}/networks/new_pools?page=2`,
+  ];
+  const byChain = new Map();
+  const results = await Promise.all(pages.map((u) => getJson(u).catch(() => null)));
+  for (const payload of results) {
+    const rows = payload && Array.isArray(payload.data) ? payload.data : [];
+    for (const row of rows) {
+      const rawId = String(dig(row, "relationships", "network", "data", "id")
+        || String(row.id || "").split("_")[0] || "").toLowerCase();
+      const chain = GECKO_TO_DEX[rawId] || rawId;
+      if (!allowedChains.has(chain)) continue;
+      const address = String((row.attributes && row.attributes.address)
+        || String(row.id || "").split("_").slice(1).join("_") || "");
+      if (!address) continue;
+      if (!byChain.has(chain)) byChain.set(chain, new Set());
+      byChain.get(chain).add(address);
+    }
+  }
+  return byChain;
+}
+
 async function discover() {
   const chains = new Set(CONFIG.discovery.chains.map((c) => String(c).toLowerCase()));
   const byKey = new Map();
@@ -796,6 +850,16 @@ async function discover() {
   }
   for (const term of CONFIG.discovery.search_terms) {
     requests.push(attempt(`${API}/latest/dex/search?q=${encodeURIComponent(term)}`));
+  }
+
+  // The widest source: live pools from GeckoTerminal, resolved back through
+  // DexScreener so every candidate carries the same fields as the rest.
+  const poolsByChain = await discoverPools(chains).catch(() => new Map());
+  for (const [chain, addresses] of poolsByChain) {
+    const list = [...addresses];
+    for (let i = 0; i < list.length; i += 30) {
+      requests.push(attempt(`${API}/latest/dex/pairs/${chain}/${list.slice(i, i + 30).join(",")}`));
+    }
   }
 
   const results = await Promise.all(requests);
@@ -1390,7 +1454,9 @@ function savePrefs() { writeStore(STORE_PREFS, PREFS); }
 
 const state = {
   passing: [],
+  lookupExtras: [],   // coins found via Look up, so buy/star can resolve them
   rejected: [],
+  repricedAt: 0,
   scannedAt: 0,
   checkedCount: 0,
   query: "",
@@ -1594,6 +1660,8 @@ function renderRejected() {
 function renderScanAge() {
   let text = state.scannedAt ? "Scanned " + relTime(state.scannedAt) : "";
   if (state.scanning) text = "Scanning…";
+  else if (state.repricedAt && Date.now() - state.repricedAt < 60000)
+    text = "Prices live · " + relTime(state.repricedAt);
   else if (PREFS.autoScan && nextScanAt) {
     const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
     text += (text ? " · " : "") + "next scan " + (s >= 90 ? Math.round(s / 60) + "m" : s + "s");
@@ -2175,6 +2243,22 @@ function renderLearn() {
     </ol>
   </section>
   <section>
+    <h2>Coverage — why a coin might not be in a scan</h2>
+    <p>Each scan pulls from three funnels: GeckoTerminal's live trending and brand-new pool
+       feeds (100+ chains), DexScreener's paid-boost feed, and keyword searches — then re-prices
+       everything through DexScreener so all candidates are measured identically. It covers the
+       chains FOMO trades, Monad included.</p>
+    <p>Even so, <b>no scan is exhaustive</b> — thousands of pairs launch daily and a scan keeps the
+       most active few hundred. If you see a coin in FOMO that isn't listed, use
+       <b>Look up any coin</b> in the Find tab: paste its ticker or contract address (FOMO shows
+       the address on the token's page) and it's fetched and scored on demand, on any chain. That
+       path has no coverage limit.</p>
+    <p><b>How live are the prices?</b> These are free polling APIs — there is no streaming feed —
+       so the app refreshes the coins on screen about every 20 seconds, re-scores them, and checks
+       your positions every 30. Fast, but always seconds behind the chain: for an exact fill price,
+       trust FOMO at the moment you trade.</p>
+  </section>
+  <section>
     <h2>Where the Feed comes from — and why no Twitter</h2>
     <p>The Feed merges ten public, read-only sources: crypto headlines, four meme subreddits,
        CoinGecko trending searches, GeckoTerminal's trending and brand-new pools (the same live
@@ -2311,6 +2395,55 @@ async function doScan() {
     btn.textContent = "Scan";
     if (PREFS.autoScan) scheduleAutoScan();  // manual scans reset the countdown too
     renderScanAge();
+  }
+}
+
+/* Fast re-price: refresh the coins currently on screen without redoing
+   discovery. These APIs are poll-only (no streaming), so "live" means a
+   ~20s refresh of prices, liquidity, volume and momentum — then rescored. */
+async function repriceVisible() {
+  if (state.scanning || state.repricing || !state.passing.length) return;
+  if (document.hidden || !$("#view-find").classList.contains("active")) return;
+
+  const shown = visibleResults().slice(0, 30);
+  if (!shown.length) return;
+
+  const byChain = new Map();
+  for (const c of shown) {
+    if (!byChain.has(c.chain)) byChain.set(c.chain, []);
+    byChain.get(c.chain).push(c.pair_address);
+  }
+
+  state.repricing = true;
+  try {
+    const fresh = new Map();
+    await Promise.all([...byChain].map(async ([chain, addresses]) => {
+      for (let i = 0; i < addresses.length; i += 30) {
+        const batch = addresses.slice(i, i + 30).join(",");
+        const payload = await getJson(`${API}/latest/dex/pairs/${chain}/${batch}`).catch(() => null);
+        for (const pair of pairsFrom(payload)) {
+          const c = toCandidate(pair);
+          if (c.pair_address) fresh.set(c.chain + ":" + c.pair_address, c);
+        }
+      }
+    }));
+    if (!fresh.size) return;
+
+    let changed = 0;
+    state.passing = state.passing.map((old) => {
+      const next = fresh.get(candidateKey(old));
+      if (!next) return old;
+      changed++;
+      next.boost_amount = old.boost_amount;
+      return applyFilters(next).length ? Object.assign(next, { score: old.score }) : scoreCandidate(next);
+    });
+    if (changed) {
+      state.repricedAt = Date.now();
+      cacheScan();
+      renderResults();
+    }
+  } finally {
+    state.repricing = false;
   }
 }
 
@@ -2499,7 +2632,7 @@ function toggleWatch(key) {
     delete watch[key];
     toast("Removed from watchlist");
   } else {
-    const c = state.passing.find((x) => candidateKey(x) === key);
+    const c = findCandidate(key);
     if (!c) return;
     watch[key] = { key, chain: c.chain, pair_address: c.pair_address, symbol: c.symbol, added_at: Date.now(), last_price: c.price_usd };
     toast(`Watching ${c.symbol} ★`, "good");
@@ -2579,8 +2712,13 @@ function suggestedSize() {
   return (PREFS.bankroll * (PREFS.risk_pct / 100)) / (sl / 100);
 }
 
+function findCandidate(key) {
+  return state.passing.find((x) => candidateKey(x) === key)
+    || state.lookupExtras.find((x) => candidateKey(x) === key);
+}
+
 function openBuyDialog(key) {
-  const c = state.passing.find((x) => candidateKey(x) === key);
+  const c = findCandidate(key);
   if (!c) return;
   pendingBuy = c;
   $("#buy-hint").textContent = `${c.symbol} on ${c.chain} — current price ${fmtPrice(c.price_usd).replace(/^\$/, "$")}`;
@@ -2606,6 +2744,95 @@ $("#buy-save").addEventListener("click", () => {
   renderBadges();
   if (state.expandedKey) renderResults();
   toast(`Tracking ${pendingBuy.symbol} — see the Positions tab`, "good");
+});
+
+/* ---------- look up any coin ----------
+   Discovery can never be exhaustive, so this is the escape hatch: anything
+   you can see in FOMO can be pasted here and scored on demand. */
+
+async function runLookup() {
+  const raw = $("#lookup-q").value.trim();
+  if (!raw) return;
+  const target = $("#lookup-results");
+  const btn = $("#lookup-go");
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  target.innerHTML = `<div class="feed-err">Searching every chain…</div>`;
+
+  // A pasted DexScreener link goes straight to that pair.
+  const link = /dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i.exec(raw);
+  let found = [];
+  try {
+    if (link) {
+      const c = await fetchPair(link[1].toLowerCase(), link[2]);
+      if (c) found = [c];
+    } else {
+      const payload = await getJson(`${API}/latest/dex/search?q=${encodeURIComponent(raw)}`);
+      found = pairsFrom(payload).map(toCandidate)
+        .sort((a, b) => b.liquidity_usd - a.liquidity_usd)
+        .slice(0, 8);
+    }
+  } catch (err) {
+    found = [];
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Search";
+
+  if (!found.length) {
+    target.innerHTML = `<div class="feed-err">Nothing found for that. Check the spelling, or paste the
+      token's contract address from FOMO — that always matches exactly.</div>`;
+    return;
+  }
+
+  // Everything found is scored the same way the scanner scores its own results.
+  target.innerHTML = found.map((c) => {
+    const reasons = applyFilters(c);
+    const key = candidateKey(c);
+    let verdict;
+    if (reasons.length) {
+      verdict = `<span class="flag" style="cursor:default">fails filters</span>
+        <span style="color:var(--faint); font-size:12px">${escapeHtml(reasons[0])}</span>`;
+    } else {
+      scoreCandidate(c);
+      verdict = `<span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>`;
+    }
+    // Stash it so the buy/star buttons can find it by key like any scan result.
+    if (!state.passing.some((x) => candidateKey(x) === key)) state.lookupExtras.push(c);
+    return `<div class="feed-item">
+      <div class="sym">${escapeHtml(c.symbol)} ${verdict}</div>
+      <div class="feed-meta">
+        <span>${escapeHtml(c.chain)}</span><span>${fmtPrice(c.price_usd)}</span>
+        <span>${fmtCompact(c.liquidity_usd)} liq</span><span>${fmtCompact(c.volume_h24)} 24h vol</span>
+        ${fmtPct(c.price_change_h1)}
+      </div>
+      <div class="feed-meta" style="margin-top:5px">
+        <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy address</button>
+        <button class="small" data-lookup-buy="${escapeHtml(key)}">I bought this</button>
+        <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+$("#btn-lookup").addEventListener("click", () => {
+  $("#lookup-q").value = "";
+  $("#lookup-results").innerHTML = "";
+  openDialog($("#dlg-lookup"));
+  $("#lookup-q").focus();
+});
+$("#lookup-go").addEventListener("click", runLookup);
+$("#lookup-q").addEventListener("keydown", (e) => { if (e.key === "Enter") runLookup(); });
+
+$("#dlg-lookup").addEventListener("click", async (e) => {
+  const buy = e.target.closest("[data-lookup-buy]");
+  if (buy) { closeDialog($("#dlg-lookup")); openBuyDialog(buy.dataset.lookupBuy); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+  }
 });
 
 /* ---------- manual add dialog ---------- */
@@ -2796,10 +3023,20 @@ function scheduleAutoCheck() {
   autoCheckTimer = setTimeout(async () => {
     if (!document.hidden) await doCheck(true);
     scheduleAutoCheck();
-  }, 60000);
+  }, 30000);
 }
 
-$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); scheduleAutoScan(); renderScanAge(); });
+let repriceTimer = null;
+
+/* Prices refresh on a short cycle independent of the full rescan, so the
+   numbers on screen stay close to live between scans. */
+function scheduleReprice() {
+  clearInterval(repriceTimer);
+  if (!PREFS.autoScan) return;   // the same switch governs live pricing
+  repriceTimer = setInterval(repriceVisible, 20000);
+}
+
+$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); scheduleAutoScan(); scheduleReprice(); renderScanAge(); });
 $("#auto-check").addEventListener("change", (e) => { PREFS.autoCheck = e.target.checked; savePrefs(); scheduleAutoCheck(); });
 
 /* ---------- init ---------- */
@@ -2822,6 +3059,7 @@ try {
   $("#auto-check").checked = !!PREFS.autoCheck;
   scheduleAutoScan();
   scheduleAutoCheck();
+  scheduleReprice();
   setInterval(renderScanAge, 1000);
   if (PREFS.tab && PREFS.tab !== "find") switchTab(PREFS.tab);
 

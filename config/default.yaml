@@ -4,12 +4,13 @@
 
 discovery:
   # Chains to scan on DexScreener. Meme coins mostly live on fast/cheap chains.
-  chains: ["solana", "base", "ethereum", "bsc"]
+  chains: ["solana", "base", "ethereum", "bsc", "monad", "arbitrum", "polygon",
+           "avalanche", "sui", "ton", "blast", "hyperliquid", "abstract", "tron"]
   # Extra free-text queries to search for on DexScreener (widens discovery beyond
   # the "boosted/trending" feed). Keep short and generic.
-  search_terms: ["pump", "meme"]
+  search_terms: ["pump", "meme", "dog", "cat", "pepe", "moon", "elon", "trump", "inu", "bonk"]
   # Max candidates to keep after discovery, before scoring/filtering.
-  max_candidates: 150
+  max_candidates: 600
 
 filters:
   # Hard excludes. A candidate failing any of these is dropped before scoring,
