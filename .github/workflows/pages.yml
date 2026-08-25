@@ -1,10 +1,13 @@
 name: Deploy website
 
-# Publishes "Coin Finder.html" as a real website via GitHub Pages, so the app
-# runs on any device with a browser (iPad included) at
+# Publishes "Coin Finder.html" as the website at
 #   https://mackmedley.github.io/Coin-Finder/
+# by rebuilding the gh-pages branch on every push to the app branch.
 #
-# NOTE: on a free GitHub plan, Pages only works while the repository is PUBLIC.
+# Why gh-pages rather than actions/deploy-pages: the workflow token isn't
+# allowed to CREATE the Pages site (configure-pages enablement fails with
+# "Resource not accessible by integration"), but on a public repo a gh-pages
+# branch enables Pages automatically, and pushing to it redeploys the site.
 
 on:
   push:
@@ -12,9 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -23,27 +24,20 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble the site
+      - name: Build the site and push it to gh-pages
         run: |
           mkdir -p _site
           cp "Coin Finder.html" _site/index.html
           cp icon.png _site/icon.png
-
-      - name: Enable and configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          cd _site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish website from ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
