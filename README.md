@@ -16,6 +16,14 @@ It **places no orders and holds no funds**. There is no wallet, no private key, 
 Double-click **`Coin Finder.html`**. It opens in your browser and works with no
 Python, no installer, and no setup. Positions are saved in that browser.
 
+What it does: sortable/searchable scan results with chain filter chips, a
+click-to-expand score breakdown (the six components as meters, so no score is a
+black box), a watchlist for coins you're not ready to buy, portfolio stat tiles
+and per-position price sparklines, note-taking on positions, import/export,
+optional auto-rescan and auto-check timers, keyboard shortcuts, and a rejected
+list that shows exactly why each coin was filtered out. The last scan is cached,
+so reopening the page shows your results instantly.
+
 It runs the same rules as the Python version: `Coin Finder.html` carries a
 JavaScript port of `scoring.py` and `sell.py`, and `tests/test_js_parity.py`
 scores a spread of payloads through both engines and fails if any score,

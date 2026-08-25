@@ -5,131 +5,264 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Coin Finder</title>
 <style>
+  /* Committed dark design: this is a local tool file, painted explicitly. */
   :root {
-    --bg: #0e1116;
-    --panel: #161b22;
-    --panel-2: #1c2330;
-    --line: #2a3441;
-    --text: #e6edf3;
+    --bg: #0b0e14;
+    --panel: #121722;
+    --panel-2: #1a212e;
+    --line: #232c3b;
+    --line-soft: #1c2431;
+    --text: #e8edf4;
     --muted: #8b98a9;
-    --accent: #4f9cf9;
+    --faint: #5c6879;
+    --accent: #3987e5;
+    --accent-soft: rgba(57,135,229,0.14);
+    --accent-ink: #06121f;
     --good: #3fb950;
-    --warn: #d29922;
-    --bad: #f85149;
-    --urgent: #ff6b6b;
+    --good-soft: rgba(63,185,80,0.14);
+    --warn: #fab219;
+    --warn-soft: rgba(250,178,25,0.14);
+    --serious: #ec835a;
+    --serious-soft: rgba(236,131,90,0.16);
+    --critical: #d03b3b;
+    --meter-track: #1b3150;
     --radius: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 8px 28px rgba(0,0,0,0.45);
   }
 
   * { box-sizing: border-box; }
+  html { scrollbar-color: var(--line) var(--bg); }
 
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
-  header {
-    border-bottom: 1px solid var(--line);
-    padding: 18px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    background: var(--panel);
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
   }
 
-  h1 { font-size: 19px; margin: 0; letter-spacing: -0.2px; }
-  h1 span { color: var(--muted); font-weight: 400; }
+  /* ---------- header ---------- */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 12px 22px;
+    background: rgba(11,14,20,0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 8px; margin-right: 6px; }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -0.2px; }
+  .brand span { color: var(--faint); font-size: 12px; }
+
+  .tabs {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .tabs button {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.active { background: var(--panel-2); color: var(--text); }
+  .tabs .badge {
+    display: inline-block;
+    min-width: 17px;
+    padding: 0 5px;
+    margin-left: 5px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .tabs .badge:empty { display: none; }
 
   .spacer { flex: 1; }
+  .header-meta { color: var(--faint); font-size: 12px; }
+
+  /* ---------- buttons & inputs ---------- */
 
   button {
     font: inherit;
-    font-weight: 500;
     color: var(--text);
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 8px 14px;
+    padding: 7px 13px;
     cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.06s;
   }
   button:hover:not(:disabled) { border-color: var(--accent); }
+  button:active:not(:disabled) { transform: translateY(1px); }
   button:disabled { opacity: 0.5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; }
-  button.small { padding: 5px 10px; font-size: 13px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.small { padding: 4px 10px; font-size: 12.5px; border-radius: 6px; }
   button.ghost { background: transparent; }
-
-  nav { display: flex; gap: 4px; padding: 12px 24px 0; }
-  nav button {
+  button.icon {
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1;
     background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
+    border-color: transparent;
     color: var(--muted);
-    padding: 8px 14px;
   }
-  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+  button.icon:hover:not(:disabled) { color: var(--text); border-color: var(--line); }
+  button.icon.on { color: var(--warn); }
 
-  main { padding: 20px 24px 60px; }
+  input, select {
+    font: inherit;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 11px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input::placeholder { color: var(--faint); }
+
+  .switch { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+  .switch input { appearance: none; width: 30px; height: 17px; margin: 0; padding: 0; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); position: relative; cursor: pointer; transition: background 0.15s; }
+  .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+  .switch input:checked { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked::after { transform: translateX(13px); background: #fff; }
+
+  /* ---------- layout ---------- */
+
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 22px 70px; }
   .view { display: none; }
-  .view.active { display: block; }
+  .view.active { display: block; animation: fadein 0.18s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar .search { flex: 1 1 200px; max-width: 320px; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12.5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.13s;
+  }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- stat tiles ---------- */
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .tile .t-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .tile .t-value { font-size: 21px; font-weight: 600; }
+  .tile .t-delta { font-size: 12.5px; margin-top: 2px; }
+  .tile .t-delta.up { color: var(--good); }
+  .tile .t-delta.down { color: #f85149; }
+
+  /* ---------- notices, toasts ---------- */
 
   .notice {
     background: var(--panel);
     border: 1px solid var(--line);
     border-left: 3px solid var(--accent);
     border-radius: var(--radius);
-    padding: 14px 16px;
-    margin-bottom: 18px;
+    padding: 13px 16px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
   }
-  .notice.error { border-left-color: var(--bad); }
-  .notice h3 { margin: 0 0 6px; font-size: 15px; }
-  .notice p { margin: 6px 0; color: var(--muted); font-size: 14px; }
-  .notice code {
-    background: var(--panel-2);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 13px;
-  }
+  .notice.error { border-left-color: var(--critical); }
+  .notice h3 { margin: 0 0 6px; font-size: 14.5px; }
+  .notice p { margin: 5px 0; color: var(--muted); }
+  .notice code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
 
-  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
-  table { border-collapse: collapse; width: 100%; min-width: 780px; }
-  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); }
+  #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    box-shadow: var(--shadow);
+    padding: 10px 16px;
+    font-size: 13.5px;
+    max-width: 340px;
+    animation: toast-in 0.2s ease;
+  }
+  .toast.good { border-left: 3px solid var(--good); }
+  .toast.bad { border-left: 3px solid var(--critical); }
+  .toast.out { opacity: 0; transform: translateY(6px); transition: all 0.25s; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- tables ---------- */
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line-soft); }
   th {
     background: var(--panel);
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--muted);
     font-weight: 600;
     position: sticky;
     top: 0;
+    z-index: 5;
+    white-space: nowrap;
+    user-select: none;
   }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: var(--text); }
+  th .arrow { font-size: 9px; margin-left: 3px; opacity: 0; }
+  th.sorted .arrow { opacity: 1; }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: var(--panel); }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr.row { cursor: pointer; transition: background 0.1s; }
+  tbody tr.row:hover { background: var(--panel-2); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .sym { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .sym .name { color: var(--faint); font-weight: 400; font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chain-tag { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 
   .score {
     display: inline-block;
-    min-width: 44px;
+    min-width: 42px;
     text-align: center;
-    padding: 4px 8px;
+    padding: 3px 7px;
     border-radius: 6px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
-  .score.hi { background: rgba(63,185,80,0.15); color: var(--good); }
-  .score.mid { background: rgba(210,153,34,0.15); color: var(--warn); }
-  .score.lo { background: rgba(139,152,169,0.15); color: var(--muted); }
+  .score.hi { background: var(--good-soft); color: var(--good); }
+  .score.mid { background: var(--warn-soft); color: var(--warn); }
+  .score.lo { background: rgba(139,152,169,0.13); color: var(--muted); }
 
-  .sym { font-weight: 600; }
-  .sym a { color: var(--text); text-decoration: none; }
-  .sym a:hover { color: var(--accent); text-decoration: underline; }
-  .chain { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  .pos { color: var(--good); }
+  .neg { color: #f85149; }
 
-  .flags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
   .flag {
     font-size: 11px;
     background: var(--panel-2);
@@ -137,88 +270,143 @@
     border: 1px solid var(--line);
     border-radius: 4px;
     padding: 1px 6px;
+    margin: 1px 3px 1px 0;
+    display: inline-block;
   }
 
-  .pos { color: var(--good); }
-  .neg { color: var(--bad); }
+  /* expanded detail row */
+  tr.detail td { background: var(--panel-2); padding: 0; }
+  .detail-inner { padding: 14px 16px; display: grid; grid-template-columns: minmax(230px, 330px) 1fr; gap: 18px; animation: fadein 0.15s ease; }
+  @media (max-width: 760px) { .detail-inner { grid-template-columns: 1fr; } }
+  .detail-inner h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+
+  .meter { display: grid; grid-template-columns: 86px 1fr 34px; align-items: center; gap: 8px; margin: 5px 0; }
+  .m-label { font-size: 12.5px; color: var(--muted); }
+  .m-track { height: 7px; border-radius: 4px; background: var(--meter-track); overflow: hidden; }
+  .m-fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; transition: width 0.3s ease; }
+  .m-val { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .kv { display: grid; grid-template-columns: auto auto; gap: 3px 16px; font-size: 13px; width: fit-content; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  .detail-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); }
 
   .verdict {
-    display: inline-block;
-    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     letter-spacing: 0.4px;
+    white-space: nowrap;
   }
-  .verdict.HOLD { background: rgba(139,152,169,0.15); color: var(--muted); }
-  .verdict.TRIM { background: rgba(210,153,34,0.18); color: var(--warn); }
-  .verdict.SELL { background: rgba(248,81,73,0.18); color: var(--bad); }
-  .verdict.URGENT { background: var(--bad); color: #fff; }
+  .verdict.HOLD { background: rgba(139,152,169,0.13); color: var(--muted); }
+  .verdict.TRIM { background: var(--warn-soft); color: var(--warn); }
+  .verdict.SELL { background: var(--serious-soft); color: var(--serious); }
+  .verdict.URGENT { background: var(--critical); color: #fff; }
 
-  .reasons { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .reasons { margin: 5px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; }
   .reasons li { margin: 2px 0; }
 
-  .empty { color: var(--muted); text-align: center; padding: 48px 20px; }
+  .spark { display: block; }
+  .spark polyline { fill: none; stroke: var(--faint); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2; }
+
+  .empty { color: var(--muted); text-align: center; padding: 44px 20px; }
+  .empty .big { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+  .steps { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; width: 200px; text-align: left; font-size: 13px; color: var(--muted); }
+  .step b { display: block; color: var(--text); margin-bottom: 4px; }
+
+  /* skeleton shimmer */
+  .skel-row { height: 42px; border-bottom: 1px solid var(--line-soft); position: relative; overflow: hidden; }
+  .skel-row::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 1.1s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  .section-toggle { background: none; border: none; color: var(--muted); font-size: 13px; padding: 6px 0; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .section-toggle:hover { color: var(--text); }
+
+  /* ---------- dialogs ---------- */
 
   dialog {
     background: var(--panel);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
     padding: 22px;
-    width: min(460px, 92vw);
+    width: min(480px, 92vw);
   }
   dialog::backdrop { background: rgba(0,0,0,0.6); }
-  dialog h2 { margin: 0 0 4px; font-size: 17px; }
-  dialog .hint { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
-  label { display: block; margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
-  input {
-    width: 100%;
-    font: inherit;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 9px 11px;
-  }
-  input:focus { outline: none; border-color: var(--accent); }
-  .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
+  dialog h2 { margin: 0 0 4px; font-size: 16px; }
+  dialog .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  dialog label { display: block; margin: 11px 0 4px; font-size: 12.5px; color: var(--muted); }
+  dialog input { width: 100%; }
+  .dlg-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
   .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
   .settings-grid .full { grid-column: 1 / -1; }
+  .settings-section { grid-column: 1 / -1; margin: 14px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--faint); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 
-  footer { color: var(--muted); font-size: 12px; padding: 0 24px 30px; }
-
-  .spin { display: inline-block; animation: spin 0.9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { color: var(--faint); font-size: 12px; max-width: 1180px; margin: 0 auto; padding: 0 22px 34px; }
+  kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Coin&nbsp;Finder <span>— meme coin screener</span></h1>
+  <div class="brand"><h1>Coin&nbsp;Finder</h1><span>meme screener</span></div>
+  <div class="tabs" id="tabs">
+    <button data-view="find" class="active">Find</button>
+    <button data-view="watch">Watchlist<span class="badge" id="watch-count"></span></button>
+    <button data-view="positions">Positions<span class="badge" id="pos-count"></span></button>
+  </div>
   <div class="spacer"></div>
+  <span class="header-meta" id="scan-age"></span>
   <button id="btn-settings" class="ghost small">Settings</button>
-  <button id="btn-scan" class="primary">Scan for coins</button>
+  <button id="btn-scan" class="primary">Scan</button>
 </header>
-
-<nav>
-  <button data-view="find" class="active">Find Coins</button>
-  <button data-view="positions">My Positions <span id="pos-count"></span></button>
-</nav>
 
 <main>
   <section id="view-find" class="view active">
+    <div class="toolbar">
+      <input id="search" class="search" type="search" placeholder="Filter coins…  ( / )">
+      <div class="chips" id="chain-chips"></div>
+      <div class="spacer"></div>
+      <label class="switch"><input type="checkbox" id="auto-scan">Auto-rescan 2&nbsp;min</label>
+    </div>
+    <div class="tiles" id="find-tiles" hidden></div>
     <div id="find-status"></div>
     <div id="find-results"></div>
+    <div id="rejected-block"></div>
+  </section>
+
+  <section id="view-watch" class="view">
+    <div class="toolbar">
+      <button id="btn-watch-refresh" class="primary">Refresh prices</button>
+      <span class="header-meta">Coins you starred — no money attached, just watching.</span>
+    </div>
+    <div id="watch-results"></div>
   </section>
 
   <section id="view-positions" class="view">
-    <div style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap;">
+    <div class="toolbar">
       <button id="btn-check" class="primary">Check for sell signals</button>
-      <button id="btn-add-manual" class="ghost">Add a position by link</button>
-      <button id="btn-export" class="ghost">Export</button>
+      <button id="btn-add-manual" class="ghost">Add by link</button>
+      <button id="btn-import" class="ghost small">Import</button>
+      <button id="btn-export" class="ghost small">Export</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <div class="spacer"></div>
+      <label class="switch"><input type="checkbox" id="auto-check">Auto-check 60&nbsp;s</label>
     </div>
+    <div class="tiles" id="pos-tiles" hidden></div>
     <div id="pos-status"></div>
     <div id="pos-results"></div>
   </section>
@@ -227,7 +415,10 @@
 <footer>
   This tool only suggests. It never places a trade, holds funds, or touches your wallet —
   you make every buy and sell yourself in FOMO. Scores are heuristics, not predictions.
+  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> tabs · <kbd>Esc</kbd> close.
 </footer>
+
+<div id="toasts"></div>
 
 <dialog id="dlg-buy">
   <h2>Track this position</h2>
@@ -238,8 +429,8 @@
   <input id="buy-price" type="number" min="0" step="any" placeholder="current">
   <label for="buy-note">Note (optional)</label>
   <input id="buy-note" type="text" placeholder="">
-  <div class="row">
-    <button data-close="dlg-buy" class="ghost">Cancel</button>
+  <div class="dlg-row">
+    <button data-close class="ghost">Cancel</button>
     <button id="buy-save" class="primary">Save</button>
   </div>
 </dialog>
@@ -248,53 +439,46 @@
   <h2>Add a position</h2>
   <p class="hint">Paste the DexScreener link for the coin you bought.</p>
   <label for="man-link">DexScreener link</label>
-  <input id="man-link" type="text" placeholder="https://dexscreener.com/solana/...">
+  <input id="man-link" type="text" placeholder="https://dexscreener.com/solana/…">
   <label for="man-amount">How much did you put in? (USD)</label>
   <input id="man-amount" type="number" min="0" step="any" placeholder="250">
   <label for="man-price">Entry price (blank = current price)</label>
   <input id="man-price" type="number" min="0" step="any" placeholder="current">
-  <div class="row">
-    <button data-close="dlg-manual" class="ghost">Cancel</button>
+  <div class="dlg-row">
+    <button data-close class="ghost">Cancel</button>
     <button id="man-save" class="primary">Add</button>
   </div>
 </dialog>
 
 <dialog id="dlg-settings">
   <h2>Settings</h2>
-  <p class="hint">Thresholds the scanner and sell rules use. Stored in this browser only.</p>
+  <p class="hint">Stored in this browser. Scan settings apply on the next scan.</p>
   <div class="settings-grid">
+    <div class="settings-section">Discovery</div>
     <div class="full">
       <label for="set-chains">Chains (comma separated)</label>
       <input id="set-chains" type="text">
     </div>
-    <div>
-      <label for="set-minliq">Min liquidity ($)</label>
-      <input id="set-minliq" type="number" min="0" step="any">
+    <div class="full">
+      <label for="set-terms">Search terms (comma separated)</label>
+      <input id="set-terms" type="text">
     </div>
-    <div>
-      <label for="set-minvol">Min 24h volume ($)</label>
-      <input id="set-minvol" type="number" min="0" step="any">
-    </div>
-    <div>
-      <label for="set-tp">Take profit (%)</label>
-      <input id="set-tp" type="number" step="any">
-    </div>
-    <div>
-      <label for="set-sl">Stop loss (%)</label>
-      <input id="set-sl" type="number" step="any">
-    </div>
-    <div>
-      <label for="set-trail">Trailing stop (%)</label>
-      <input id="set-trail" type="number" step="any">
-    </div>
-    <div>
-      <label for="set-liqdrop">Liquidity drop alert (%)</label>
-      <input id="set-liqdrop" type="number" step="any">
-    </div>
+    <div class="settings-section">Buy filters</div>
+    <div><label for="set-minliq">Min liquidity ($)</label><input id="set-minliq" type="number" min="0" step="any"></div>
+    <div><label for="set-minvol">Min 24h volume ($)</label><input id="set-minvol" type="number" min="0" step="any"></div>
+    <div><label for="set-minage">Min age (minutes)</label><input id="set-minage" type="number" min="0" step="any"></div>
+    <div><label for="set-maxage">Max age (days)</label><input id="set-maxage" type="number" min="0" step="any"></div>
+    <div><label for="set-fdv">Max FDV ÷ liquidity</label><input id="set-fdv" type="number" min="0" step="any"></div>
+    <div><label for="set-buyratio">Min 1h buys (%)</label><input id="set-buyratio" type="number" min="0" max="100" step="any"></div>
+    <div class="settings-section">Sell rules</div>
+    <div><label for="set-tp">Take profit (%)</label><input id="set-tp" type="number" step="any"></div>
+    <div><label for="set-sl">Stop loss (%)</label><input id="set-sl" type="number" step="any"></div>
+    <div><label for="set-trail">Trailing stop (%)</label><input id="set-trail" type="number" step="any"></div>
+    <div><label for="set-liqdrop">Liquidity drop alert (%)</label><input id="set-liqdrop" type="number" step="any"></div>
   </div>
-  <div class="row">
+  <div class="dlg-row">
     <button id="set-reset" class="ghost">Reset to defaults</button>
-    <button data-close="dlg-settings" class="ghost">Cancel</button>
+    <button data-close class="ghost">Cancel</button>
     <button id="set-save" class="primary">Save</button>
   </div>
 </dialog>
@@ -745,11 +929,7 @@ function loadPositions() {
 }
 
 function savePositions(positions) {
-  if (!writeStore(STORE_POSITIONS, positions)) {
-    alert("Couldn't save. Your browser is blocking site data for local files — " +
-          "positions won't persist after you close this page.");
-  }
-  renderPositionCount();
+  return writeStore(STORE_POSITIONS, positions);
 }
 
 function addPosition(candidate, amountUsd, entryPrice, note) {
@@ -767,16 +947,27 @@ function addPosition(candidate, amountUsd, entryPrice, note) {
     opened_at: Date.now() / 1000,
     peak_price_usd: price,
     note: note || "",
+    history: [{ t: Date.now(), p: price }],
   };
   savePositions(positions);
+  return positions[key];
 }
 
 /* ------------------------------------------------------------------ *
- * Rendering
+ * Rendering helpers
  * ------------------------------------------------------------------ */
 
 const $ = (sel) => document.querySelector(sel);
-let lastResults = [];
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+const STORE_WATCH = "coinfinder.watchlist";
+const STORE_LASTSCAN = "coinfinder.lastscan";
+const STORE_PREFS = "coinfinder.prefs";
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
 
 function fmtPrice(p) {
   if (!p) return "—";
@@ -787,10 +978,12 @@ function fmtPrice(p) {
 
 function fmtCompact(n) {
   if (!n) return "—";
-  if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
-  if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return "$" + (n / 1e3).toFixed(0) + "K";
-  return "$" + n.toFixed(0);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1e9) return sign + "$" + (abs / 1e9).toFixed(1) + "B";
+  if (abs >= 1e6) return sign + "$" + (abs / 1e6).toFixed(1) + "M";
+  if (abs >= 1e3) return sign + "$" + (abs / 1e3).toFixed(1) + "K";
+  return sign + "$" + abs.toFixed(0);
 }
 
 function fmtAge(hours) {
@@ -800,9 +993,17 @@ function fmtAge(hours) {
   return (hours / 24).toFixed(1) + "d";
 }
 
-function fmtPct(p) {
+function fmtPct(p, digits = 1) {
   const cls = p >= 0 ? "pos" : "neg";
-  return `<span class="${cls}">${p >= 0 ? "+" : ""}${p.toFixed(1)}%</span>`;
+  return `<span class="${cls}">${p >= 0 ? "+" : ""}${p.toFixed(digits)}%</span>`;
+}
+
+function relTime(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 50) return "just now";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  if (s < 86400) return (s / 3600).toFixed(1) + " h ago";
+  return Math.round(s / 86400) + " d ago";
 }
 
 function scoreClass(score) {
@@ -811,96 +1012,419 @@ function scoreClass(score) {
   return "lo";
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (ch) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+function toast(message, kind) {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.textContent = message;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, 3500);
 }
 
-function renderResults(passing, rejectedCount) {
-  lastResults = passing;
-  if (!passing.length) {
-    $("#find-results").innerHTML =
-      `<div class="empty">Nothing passed the filters.<br>` +
-      `${rejectedCount} candidate${rejectedCount === 1 ? "" : "s"} were checked and rejected. ` +
-      `Try loosening the thresholds in Settings.</div>`;
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (err2) {
+      return false;
+    }
+  }
+}
+
+/** Trend sparkline: de-emphasis stroke, accent end dot with a surface ring. */
+function sparklineSvg(points, width = 92, height = 26) {
+  if (!points || points.length < 2) return "";
+  const last = points.slice(-24);
+  const values = last.map((pt) => pt.p);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pad = 4;
+  const coords = last.map((pt, i) => {
+    const x = pad + (i / (last.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((pt.p - min) / span) * (height - pad * 2);
+    return [x, y];
+  });
+  const pts = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const [ex, ey] = coords[coords.length - 1];
+  return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">
+    <polyline points="${pts}"></polyline>
+    <circle class="dot" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="3"></circle>
+  </svg>`;
+}
+
+function meterRow(label, value) {
+  const pct = Math.round(clamp(value) * 100);
+  return `<div class="meter">
+    <span class="m-label">${escapeHtml(label)}</span>
+    <div class="m-track"><div class="m-fill" style="width:${pct}%"></div></div>
+    <span class="m-val">${pct}</span>
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * App state
+ * ------------------------------------------------------------------ */
+
+let PREFS = Object.assign({ autoScan: false, autoCheck: false, tab: "find" }, readStore(STORE_PREFS, {}));
+function savePrefs() { writeStore(STORE_PREFS, PREFS); }
+
+const state = {
+  passing: [],
+  rejected: [],
+  scannedAt: 0,
+  checkedCount: 0,
+  query: "",
+  chainFilter: new Set(),      // empty = all
+  sortKey: "score",
+  sortDir: -1,
+  expandedKey: null,
+  showRejected: false,
+  signals: null,
+  posExpandedKey: null,
+  scanning: false,
+  checking: false,
+};
+
+function loadWatchlist() {
+  const raw = readStore(STORE_WATCH, {});
+  return raw && typeof raw === "object" ? raw : {};
+}
+function saveWatchlist(w) { writeStore(STORE_WATCH, w); renderBadges(); }
+
+function candidateKey(c) { return c.chain + ":" + c.pair_address; }
+
+/* ------------------------------------------------------------------ *
+ * Find view
+ * ------------------------------------------------------------------ */
+
+const SORTS = {
+  score: (c) => c.score,
+  symbol: (c) => c.symbol.toLowerCase(),
+  price: (c) => c.price_usd,
+  h1: (c) => c.price_change_h1,
+  h6: (c) => c.price_change_h6,
+  h24: (c) => c.price_change_h24,
+  liq: (c) => c.liquidity_usd,
+  vol: (c) => c.volume_h24,
+  age: (c) => c.age_hours || Infinity,
+};
+
+const FIND_COLUMNS = [
+  ["score", "Score", "num"],
+  ["symbol", "Coin", ""],
+  ["price", "Price", "num"],
+  ["h1", "1h", "num"],
+  ["h6", "6h", "num"],
+  ["h24", "24h", "num"],
+  ["liq", "Liquidity", "num"],
+  ["vol", "24h Vol", "num"],
+  ["age", "Age", "num"],
+];
+
+function visibleResults() {
+  const q = state.query.trim().toLowerCase();
+  let rows = state.passing;
+  if (state.chainFilter.size) rows = rows.filter((c) => state.chainFilter.has(c.chain));
+  if (q) rows = rows.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+  const keyFn = SORTS[state.sortKey] || SORTS.score;
+  return rows.slice().sort((a, b) => {
+    const ka = keyFn(a), kb = keyFn(b);
+    return (ka < kb ? -1 : ka > kb ? 1 : 0) * state.sortDir;
+  });
+}
+
+function renderChainChips() {
+  const present = new Set(state.passing.map((c) => c.chain));
+  for (const chain of CONFIG.discovery.chains) present.add(String(chain).toLowerCase());
+  const html = [...present].sort().map((chain) => {
+    const on = state.chainFilter.size === 0 || state.chainFilter.has(chain);
+    return `<button class="chip ${on ? "on" : ""}" data-chain="${escapeHtml(chain)}">${escapeHtml(chain)}</button>`;
+  }).join("");
+  $("#chain-chips").innerHTML = html;
+}
+
+function renderFindTiles() {
+  const tiles = $("#find-tiles");
+  if (!state.scannedAt) { tiles.hidden = true; return; }
+  const top = state.passing[0];
+  tiles.hidden = false;
+  tiles.innerHTML = `
+    <div class="tile"><div class="t-label">Pairs checked</div><div class="t-value">${state.checkedCount}</div></div>
+    <div class="tile"><div class="t-label">Passed filters</div><div class="t-value">${state.passing.length}</div></div>
+    <div class="tile"><div class="t-label">Rejected</div><div class="t-value">${state.rejected.length}</div></div>
+    <div class="tile"><div class="t-label">Top score</div><div class="t-value">${top ? top.score.toFixed(0) + " · " + escapeHtml(top.symbol) : "—"}</div></div>`;
+}
+
+function watchStar(key) {
+  const watching = !!loadWatchlist()[key];
+  return `<button class="icon ${watching ? "on" : ""}" data-star="${escapeHtml(key)}" title="${watching ? "Remove from watchlist" : "Add to watchlist"}">${watching ? "★" : "☆"}</button>`;
+}
+
+function detailRowHtml(c, colspan) {
+  const b = c.score_breakdown || {};
+  const positions = loadPositions();
+  const tracked = !!positions[candidateKey(c)];
+  return `<tr class="detail"><td colspan="${colspan}"><div class="detail-inner">
+    <div>
+      <h4>Score breakdown</h4>
+      ${meterRow("Liquidity", b.liquidity || 0)}
+      ${meterRow("Turnover", b.turnover || 0)}
+      ${meterRow("Momentum", b.momentum || 0)}
+      ${meterRow("Buy pressure", b.buy_pressure || 0)}
+      ${meterRow("Age fit", b.age_fit || 0)}
+      ${meterRow("Safety", b.safety || 0)}
+    </div>
+    <div>
+      <h4>Details</h4>
+      <dl class="kv">
+        <dt>FDV</dt><dd>${fmtCompact(c.fdv)}</dd>
+        <dt>FDV ÷ liquidity</dt><dd>${c.fdv_to_liquidity ? c.fdv_to_liquidity.toFixed(1) + "×" : "—"}</dd>
+        <dt>1h trades</dt><dd>${c.buys_h1} buys / ${c.sells_h1} sells</dd>
+        <dt>24h trades</dt><dd>${c.buys_h24} buys / ${c.sells_h24} sells</dd>
+        <dt>Turnover</dt><dd>${c.turnover_ratio.toFixed(2)}× pool / 24h</dd>
+        <dt>Links</dt><dd>${c.socials.length + c.websites.length ? `${c.socials.length} social · ${c.websites.length} site` : "none listed"}</dd>
+        <dt>DEX</dt><dd>${escapeHtml(c.dex)}</dd>
+      </dl>
+      ${c.flags && c.flags.length ? `<div style="margin-top:8px">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
+    </div>
+    <div class="detail-actions">
+      <button class="small primary" data-buy="${escapeHtml(candidateKey(c))}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
+      <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy token address</button>
+      <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener"><button class="small ghost">Open DexScreener ↗</button></a>
+    </div>
+  </div></td></tr>`;
+}
+
+function renderResults() {
+  renderChainChips();
+  renderFindTiles();
+  const target = $("#find-results");
+
+  if (!state.scannedAt) {
+    target.innerHTML = `<div class="empty">
+      <div class="big">Find meme coins worth a look</div>
+      Press <b>Scan</b> to pull live pair data, filter out the untradeable, and rank the rest.
+      <div class="steps">
+        <div class="step"><b>1 · Scan</b>Live pairs are filtered by liquidity, volume, age and buy pressure, then scored 0–100.</div>
+        <div class="step"><b>2 · Inspect</b>Click a row to see exactly why it scored what it did — six components, no black box.</div>
+        <div class="step"><b>3 · Track</b>Buy in FOMO, press “I bought this”, and the Positions tab watches for exit signals.</div>
+      </div>
+    </div>`;
+    $("#rejected-block").innerHTML = "";
     return;
   }
 
-  const rows = passing.map((c, i) => `
-    <tr>
-      <td class="num"><span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span></td>
-      <td>
-        <div class="sym"><a href="${escapeHtml(c.url)}" target="_blank" rel="noopener">${escapeHtml(c.symbol)}</a></div>
-        <div class="chain">${escapeHtml(c.chain)}</div>
-        ${c.flags.length ? `<div class="flags">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
-      </td>
-      <td class="num">${fmtPrice(c.price_usd)}</td>
-      <td class="num">${fmtPct(c.price_change_h1)}</td>
-      <td class="num">${fmtCompact(c.liquidity_usd)}</td>
-      <td class="num">${fmtCompact(c.volume_h24)}</td>
-      <td class="num">${fmtAge(c.age_hours)}</td>
-      <td><button class="small" data-buy="${i}">I bought this</button></td>
-    </tr>`).join("");
+  const rows = visibleResults();
+  if (!rows.length) {
+    const why = state.passing.length
+      ? "No coins match the current search / chain filter."
+      : "Nothing passed the filters this scan. Try loosening thresholds in Settings.";
+    target.innerHTML = `<div class="empty">${why}</div>`;
+  } else {
+    const colspan = FIND_COLUMNS.length + 1;
+    const head = FIND_COLUMNS.map(([key, label, cls]) => {
+      const sorted = state.sortKey === key;
+      const arrow = sorted ? (state.sortDir === -1 ? "▼" : "▲") : "▼";
+      return `<th class="sortable ${sorted ? "sorted" : ""}" data-sort="${key}" style="${cls === "num" ? "text-align:right" : ""}">${label}<span class="arrow">${arrow}</span></th>`;
+    }).join("") + "<th></th>";
 
-  $("#find-results").innerHTML = `
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th>Score</th><th>Coin</th><th style="text-align:right">Price</th>
-        <th style="text-align:right">1h</th><th style="text-align:right">Liquidity</th>
-        <th style="text-align:right">24h Vol</th><th style="text-align:right">Age</th><th></th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
+    const body = rows.map((c) => {
+      const key = candidateKey(c);
+      const expanded = state.expandedKey === key;
+      return `<tr class="row" data-key="${escapeHtml(key)}">
+        <td class="num"><span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span></td>
+        <td><div class="sym">${escapeHtml(c.symbol)}<span class="name">${escapeHtml(c.name)}</span></div>
+            <span class="chain-tag">${escapeHtml(c.chain)}</span></td>
+        <td class="num">${fmtPrice(c.price_usd)}</td>
+        <td class="num">${fmtPct(c.price_change_h1)}</td>
+        <td class="num">${fmtPct(c.price_change_h6)}</td>
+        <td class="num">${fmtPct(c.price_change_h24)}</td>
+        <td class="num">${fmtCompact(c.liquidity_usd)}</td>
+        <td class="num">${fmtCompact(c.volume_h24)}</td>
+        <td class="num">${fmtAge(c.age_hours)}</td>
+        <td>${watchStar(key)}</td>
+      </tr>${expanded ? detailRowHtml(c, colspan) : ""}`;
+    }).join("");
+
+    target.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  renderRejected();
+  renderScanAge();
 }
 
-function renderSignals(signals) {
-  if (!signals.length) {
-    $("#pos-results").innerHTML =
-      `<div class="empty">No positions tracked yet.<br>` +
-      `Scan for coins and press "I bought this" after you buy one in FOMO.</div>`;
+function renderRejected() {
+  const block = $("#rejected-block");
+  if (!state.rejected.length) { block.innerHTML = ""; return; }
+  const rows = state.showRejected
+    ? state.rejected.slice(0, 40).map((c) => `
+        <tr><td><div class="sym">${escapeHtml(c.symbol)}</div><span class="chain-tag">${escapeHtml(c.chain)}</span></td>
+        <td class="num">${fmtCompact(c.volume_h24)}</td>
+        <td>${(c.reject_reasons || []).map((r) => `<span class="flag">${escapeHtml(r)}</span>`).join("")}</td></tr>`).join("")
+    : "";
+  block.innerHTML = `
+    <button class="section-toggle" id="toggle-rejected">${state.showRejected ? "▾" : "▸"} Rejected by filters (${state.rejected.length})</button>
+    ${state.showRejected ? `<div class="table-wrap"><table style="min-width:640px">
+      <thead><tr><th>Coin</th><th style="text-align:right">24h Vol</th><th>Why it was rejected</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : ""}`;
+}
+
+function renderScanAge() {
+  $("#scan-age").textContent = state.scannedAt ? "Scanned " + relTime(state.scannedAt) : "";
+}
+
+/* ------------------------------------------------------------------ *
+ * Positions view
+ * ------------------------------------------------------------------ */
+
+function renderPosTiles(signals) {
+  const tiles = $("#pos-tiles");
+  const live = signals.filter((s) => !s.stale);
+  if (!signals.length) { tiles.hidden = true; return; }
+  const invested = signals.reduce((sum, s) => sum + s.position.amount_usd, 0);
+  const pnl = live.reduce((sum, s) => sum + s.pnl_usd, 0);
+  const value = invested + pnl;
+  const actionable = signals.filter((s) => s.verdict !== "HOLD").length;
+  const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+  tiles.hidden = false;
+  tiles.innerHTML = `
+    <div class="tile"><div class="t-label">Invested</div><div class="t-value">${fmtCompact(invested)}</div></div>
+    <div class="tile"><div class="t-label">Value now</div><div class="t-value">${fmtCompact(value)}</div>
+      <div class="t-delta ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "▲" : "▼"} ${fmtCompact(Math.abs(pnl))} (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)</div></div>
+    <div class="tile"><div class="t-label">Positions</div><div class="t-value">${signals.length}</div></div>
+    <div class="tile"><div class="t-label">Exit signals</div><div class="t-value">${actionable}</div></div>`;
+}
+
+function posDetailHtml(s, colspan) {
+  const p = s.position;
+  const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
+  return `<tr class="detail"><td colspan="${colspan}"><div class="detail-inner">
+    <div>
+      <h4>Position</h4>
+      <dl class="kv">
+        <dt>Opened</dt><dd>${new Date(p.opened_at * 1000).toLocaleString()} (${fmtAge(holdHours)} ago)</dd>
+        <dt>Size</dt><dd>${fmtCompact(p.amount_usd)}</dd>
+        <dt>Peak price</dt><dd>${fmtPrice(Math.max(p.peak_price_usd, s.price_usd || 0))}</dd>
+        <dt>From peak</dt><dd>${s.stale ? "—" : fmtPct(s.drawdown_from_peak_pct)}</dd>
+        <dt>Liquidity vs entry</dt><dd>${s.stale ? "—" : fmtPct(s.liquidity_change_pct)}</dd>
+        <dt>Pair</dt><dd style="font-size:11.5px">${escapeHtml(p.pair_address.slice(0, 18))}…</dd>
+      </dl>
+    </div>
+    <div>
+      <h4>Note</h4>
+      <div style="display:flex; gap:8px;">
+        <input id="note-input" type="text" value="${escapeHtml(p.note || "")}" placeholder="Why did you buy?">
+        <button class="small" data-save-note="${escapeHtml(p.key)}">Save</button>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="small" data-copy="${escapeHtml(p.pair_address)}">Copy pair address</button>
+      <a href="https://dexscreener.com/${escapeHtml(p.chain)}/${escapeHtml(p.pair_address)}" target="_blank" rel="noopener"><button class="small ghost">Open DexScreener ↗</button></a>
+      <button class="small ghost" data-remove="${escapeHtml(p.key)}" style="color:#f85149">Stop tracking</button>
+    </div>
+  </div></td></tr>`;
+}
+
+function renderSignals() {
+  const target = $("#pos-results");
+  const signals = state.signals;
+
+  if (!signals || !signals.length) {
+    const n = Object.keys(loadPositions()).length;
+    renderPosTiles([]);
+    target.innerHTML = n
+      ? `<div class="empty"><div class="big">${n} position${n === 1 ? "" : "s"} tracked</div>Press <b>Check for sell signals</b> to price them and evaluate the exit rules.</div>`
+      : `<div class="empty"><div class="big">No positions yet</div>Scan for coins, buy one in FOMO, then press “I bought this” — exit rules watch it here.</div>`;
     return;
   }
 
+  renderPosTiles(signals);
   const order = { "URGENT SELL": 0, SELL: 1, TRIM: 2, HOLD: 3 };
-  signals.sort((a, b) => order[a.verdict] - order[b.verdict]);
+  const sorted = signals.slice().sort((a, b) => order[a.verdict] - order[b.verdict]);
+  const colspan = 8;
 
-  const rows = signals.map((s) => {
+  const rows = sorted.map((s) => {
     const p = s.position;
     const cls = s.verdict === "URGENT SELL" ? "URGENT" : s.verdict;
-    return `
-      <tr>
-        <td><span class="verdict ${cls}">${s.verdict}</span></td>
-        <td>
-          <div class="sym">${escapeHtml(p.symbol)}</div>
-          <div class="chain">${escapeHtml(p.chain)}</div>
-          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
-        </td>
-        <td class="num">${fmtPrice(p.entry_price_usd)}</td>
-        <td class="num">${fmtPrice(s.price_usd)}</td>
-        <td class="num">${s.stale ? "—" : fmtPct(s.pnl_pct)}</td>
-        <td class="num">${s.stale ? "—" : `<span class="${s.pnl_usd >= 0 ? "pos" : "neg"}">${s.pnl_usd >= 0 ? "+" : "-"}$${Math.abs(s.pnl_usd).toFixed(2)}</span>`}</td>
-        <td><button class="small ghost" data-remove="${escapeHtml(p.key)}">Remove</button></td>
-      </tr>`;
+    const expanded = state.posExpandedKey === p.key;
+    return `<tr class="row" data-poskey="${escapeHtml(p.key)}">
+      <td><span class="verdict ${cls}">${s.verdict}</span></td>
+      <td><div class="sym">${escapeHtml(p.symbol)}</div><span class="chain-tag">${escapeHtml(p.chain)}</span>
+          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul></td>
+      <td>${sparklineSvg(p.history)}</td>
+      <td class="num">${fmtPrice(p.entry_price_usd)}</td>
+      <td class="num">${fmtPrice(s.price_usd)}</td>
+      <td class="num">${s.stale ? "—" : fmtPct(s.pnl_pct)}</td>
+      <td class="num">${s.stale ? "—" : `<span class="${s.pnl_usd >= 0 ? "pos" : "neg"}">${s.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(s.pnl_usd).toFixed(2)}</span>`}</td>
+      <td class="num">${fmtCompact(p.amount_usd)}</td>
+    </tr>${expanded ? posDetailHtml(s, colspan) : ""}`;
   }).join("");
 
-  $("#pos-results").innerHTML = `
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th>Verdict</th><th>Coin &amp; why</th><th style="text-align:right">Entry</th>
-        <th style="text-align:right">Now</th><th style="text-align:right">P&amp;L</th>
-        <th style="text-align:right">P&amp;L $</th><th></th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
+  target.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Verdict</th><th>Coin &amp; why</th><th>Trend</th>
+      <th style="text-align:right">Entry</th><th style="text-align:right">Now</th>
+      <th style="text-align:right">P&amp;L</th><th style="text-align:right">P&amp;L $</th>
+      <th style="text-align:right">Size</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
 }
 
-function renderPositionCount() {
+/* ------------------------------------------------------------------ *
+ * Watchlist view
+ * ------------------------------------------------------------------ */
+
+function renderWatchlist(priced) {
+  const target = $("#watch-results");
+  const watch = loadWatchlist();
+  const keys = Object.keys(watch);
+  if (!keys.length) {
+    target.innerHTML = `<div class="empty"><div class="big">Watchlist is empty</div>Star ☆ a coin in the Find tab to keep an eye on it without buying.</div>`;
+    return;
+  }
+  const rows = keys.map((key) => {
+    const w = watch[key];
+    const c = priced && priced[key];
+    return `<tr class="row" data-watchkey="${escapeHtml(key)}">
+      <td><div class="sym">${escapeHtml(w.symbol)}</div><span class="chain-tag">${escapeHtml(w.chain)}</span></td>
+      <td class="num">${c ? fmtPrice(c.price_usd) : fmtPrice(w.last_price || 0)}</td>
+      <td class="num">${c ? fmtPct(c.price_change_h1) : "—"}</td>
+      <td class="num">${c ? fmtCompact(c.liquidity_usd) : "—"}</td>
+      <td class="num">${c ? (c.score != null ? `<span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>` : `<span class="flag">fails filters</span>`) : "—"}</td>
+      <td class="num" style="color:var(--faint)">${relTime(w.added_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="small" data-watch-buy="${escapeHtml(key)}">I bought this</button>
+        <a href="https://dexscreener.com/${escapeHtml(w.chain)}/${escapeHtml(w.pair_address)}" target="_blank" rel="noopener"><button class="small ghost">Open ↗</button></a>
+        <button class="icon on" data-star="${escapeHtml(key)}" title="Remove from watchlist">★</button>
+      </td>
+    </tr>`;
+  }).join("");
+  target.innerHTML = `<div class="table-wrap"><table style="min-width:720px">
+    <thead><tr><th>Coin</th><th style="text-align:right">Price</th><th style="text-align:right">1h</th>
+    <th style="text-align:right">Liquidity</th><th style="text-align:right">Score</th>
+    <th style="text-align:right">Added</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared bits
+ * ------------------------------------------------------------------ */
+
+function renderBadges() {
   const n = Object.keys(loadPositions()).length;
-  $("#pos-count").textContent = n ? `(${n})` : "";
-}
-
-function setStatus(target, html) {
-  $(target).innerHTML = html || "";
+  const w = Object.keys(loadWatchlist()).length;
+  $("#pos-count").textContent = n || "";
+  $("#watch-count").textContent = w || "";
 }
 
 function networkErrorNotice(err) {
@@ -911,7 +1435,7 @@ function networkErrorNotice(err) {
          <code>api.dexscreener.com</code> — some browsers refuse cross-site
          requests from a file opened directly off your disk.</p>
       <p><strong>Two things to try, in order:</strong></p>
-      <p>1. Check you're online, then press Scan again.</p>
+      <p>1. Check you're online, then try again.</p>
       <p>2. If it keeps failing, use the Python version instead — double-click
          <code>Coin Finder.command</code> (Mac) or <code>Coin Finder.bat</code> (Windows)
          in the same folder. It fetches the same data without the browser restriction.</p>
@@ -919,87 +1443,147 @@ function networkErrorNotice(err) {
     </div>`;
 }
 
+function cacheScan() {
+  writeStore(STORE_LASTSCAN, {
+    t: state.scannedAt,
+    checked: state.checkedCount,
+    passing: state.passing,
+    rejected: state.rejected.map((c) => ({
+      symbol: c.symbol, name: c.name, chain: c.chain, pair_address: c.pair_address,
+      volume_h24: c.volume_h24, reject_reasons: c.reject_reasons,
+    })),
+  });
+}
+
+function hydrateScan() {
+  const cached = readStore(STORE_LASTSCAN, null);
+  if (!cached || !Array.isArray(cached.passing)) return;
+  state.passing = cached.passing;
+  state.rejected = cached.rejected || [];
+  state.scannedAt = cached.t || 0;
+  state.checkedCount = cached.checked || 0;
+}
+
 /* ------------------------------------------------------------------ *
  * Actions
  * ------------------------------------------------------------------ */
 
 async function doScan() {
+  if (state.scanning) return;
+  state.scanning = true;
   const btn = $("#btn-scan");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin">◜</span> Scanning…';
-  setStatus("#find-status", "");
-  $("#find-results").innerHTML = "";
+  btn.textContent = "Scanning…";
+  $("#find-status").innerHTML = "";
+  $("#find-results").innerHTML = `<div class="table-wrap">${'<div class="skel-row"></div>'.repeat(7)}</div>`;
 
   try {
     const candidates = await discover();
     if (!candidates.length) {
-      setStatus("#find-status", `
-        <div class="notice">
-          <h3>No pairs came back</h3>
-          <p>The provider returned nothing for these chains. This can happen briefly;
-             try again in a minute, or widen the chain list in Settings.</p>
-        </div>`);
+      $("#find-status").innerHTML = `<div class="notice"><h3>No pairs came back</h3>
+        <p>The provider returned nothing for these chains. This can happen briefly;
+        try again in a minute, or widen the chain list in Settings.</p></div>`;
+      renderResults();
       return;
     }
     const { passing, rejected } = rank(candidates);
-    setStatus("#find-status", `
-      <div class="notice">
-        <p style="margin:0">Checked <strong>${candidates.length}</strong> pairs ·
-        <strong>${passing.length}</strong> passed the safety filters ·
-        <strong>${rejected.length}</strong> rejected ·
-        scanned ${new Date().toLocaleTimeString()}</p>
-      </div>`);
-    renderResults(passing, rejected.length);
+    state.passing = passing;
+    state.rejected = rejected;
+    state.scannedAt = Date.now();
+    state.checkedCount = candidates.length;
+    state.expandedKey = null;
+    cacheScan();
+    renderResults();
+    toast(`Scan done — ${passing.length} of ${candidates.length} passed`, "good");
   } catch (err) {
-    setStatus("#find-status", networkErrorNotice(err));
+    $("#find-status").innerHTML = networkErrorNotice(err);
+    renderResults();
   } finally {
+    state.scanning = false;
     btn.disabled = false;
-    btn.textContent = "Scan for coins";
+    btn.textContent = "Scan";
   }
 }
 
-async function doCheck() {
+async function doCheck(silent) {
+  if (state.checking) return;
   const positions = loadPositions();
   const keys = Object.keys(positions);
-  if (!keys.length) {
-    renderSignals([]);
-    return;
-  }
+  if (!keys.length) { state.signals = null; renderSignals(); return; }
 
+  state.checking = true;
   const btn = $("#btn-check");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin">◜</span> Checking…';
-  setStatus("#pos-status", "");
+  btn.textContent = "Checking…";
+  if (!silent) $("#pos-status").innerHTML = "";
 
   try {
-    const signals = [];
-    let failures = 0;
-    for (const key of keys) {
+    const results = await Promise.all(keys.map(async (key) => {
       const p = positions[key];
       const current = await fetchPair(p.chain, p.pair_address);
+      return [key, current];
+    }));
+
+    let failures = 0;
+    const signals = [];
+    const now = Date.now();
+    for (const [key, current] of results) {
+      const p = positions[key];
       if (!current) failures++;
       const signal = evaluatePosition(p, current);
-      // Ratchet the peak so the trailing stop keeps working between checks.
-      if (signal.peak && signal.peak > p.peak_price_usd) {
-        positions[key].peak_price_usd = signal.peak;
+      if (signal.peak && signal.peak > p.peak_price_usd) p.peak_price_usd = signal.peak;
+      if (current && current.price_usd > 0) {
+        p.history = (p.history || []).concat({ t: now, p: current.price_usd }).slice(-60);
       }
       signals.push(signal);
     }
     savePositions(positions);
-    const actionable = signals.filter((s) => s.verdict !== "HOLD").length;
-    setStatus("#pos-status", `
-      <div class="notice">
-        <p style="margin:0">${signals.length} position${signals.length === 1 ? "" : "s"} ·
-        <strong>${actionable}</strong> with an exit signal ·
-        checked ${new Date().toLocaleTimeString()}
-        ${failures ? ` · <span class="neg">${failures} couldn't be priced</span>` : ""}</p>
-      </div>`);
-    renderSignals(signals);
-  } catch (err) {
-    setStatus("#pos-status", networkErrorNotice(err));
+    state.signals = signals;
+    renderSignals();
+
+    const actionable = signals.filter((s) => s.verdict !== "HOLD");
+    if (failures === keys.length && keys.length > 0) {
+      $("#pos-status").innerHTML = networkErrorNotice(new Error(`all ${failures} price lookups failed`));
+    } else if (!silent) {
+      toast(actionable.length
+        ? `${actionable.length} position${actionable.length === 1 ? "" : "s"} with an exit signal`
+        : "All positions holding — no exit rules triggered", actionable.length ? "bad" : "good");
+    } else if (actionable.length) {
+      toast(`${actionable.length} position${actionable.length === 1 ? "" : "s"} with an exit signal`, "bad");
+    }
   } finally {
+    state.checking = false;
     btn.disabled = false;
     btn.textContent = "Check for sell signals";
+  }
+}
+
+async function refreshWatchlist() {
+  const watch = loadWatchlist();
+  const keys = Object.keys(watch);
+  if (!keys.length) { renderWatchlist(null); return; }
+  const btn = $("#btn-watch-refresh");
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  try {
+    const priced = {};
+    let failures = 0;
+    await Promise.all(keys.map(async (key) => {
+      const w = watch[key];
+      const c = await fetchPair(w.chain, w.pair_address);
+      if (!c) { failures++; return; }
+      // Score it with live thresholds, but tolerate coins that now fail filters.
+      if (applyFilters(c).length === 0) scoreCandidate(c);
+      else c.score = null;
+      priced[key] = c;
+      w.last_price = c.price_usd;
+    }));
+    saveWatchlist(watch);
+    renderWatchlist(priced);
+    if (failures === keys.length) toast("Couldn't price the watchlist — network problem?", "bad");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Refresh prices";
   }
 }
 
@@ -1007,94 +1591,219 @@ async function doCheck() {
  * Wiring
  * ------------------------------------------------------------------ */
 
-document.querySelectorAll("nav button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-    btn.classList.add("active");
-    $("#view-" + btn.dataset.view).classList.add("active");
-    if (btn.dataset.view === "positions" && !$("#pos-results").innerHTML) {
-      renderSignals([]);
-    }
-  });
-});
+function switchTab(name) {
+  PREFS.tab = name;
+  savePrefs();
+  $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
+  if (name === "positions") {
+    renderSignals();
+    // First visit with tracked positions: check automatically instead of
+    // making the user find the button.
+    if (!state.signals && Object.keys(loadPositions()).length) doCheck(true);
+  }
+  if (name === "watch") renderWatchlist(null);
+}
 
-document.querySelectorAll("[data-close]").forEach((btn) => {
-  btn.addEventListener("click", () => $("#" + btn.dataset.close).close());
+$("#tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-view]");
+  if (btn) switchTab(btn.dataset.view);
 });
 
 $("#btn-scan").addEventListener("click", doScan);
-$("#btn-check").addEventListener("click", doCheck);
+$("#btn-check").addEventListener("click", () => doCheck(false));
+$("#btn-watch-refresh").addEventListener("click", refreshWatchlist);
+
+$("#search").addEventListener("input", (() => {
+  let timer = null;
+  return (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { state.query = e.target.value; renderResults(); }, 120);
+  };
+})());
+
+$("#chain-chips").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-chain]");
+  if (!chip) return;
+  const chain = chip.dataset.chain;
+  if (state.chainFilter.size === 0) {
+    // From "all on", clicking one narrows to just it.
+    state.chainFilter = new Set([chain]);
+  } else if (state.chainFilter.has(chain)) {
+    state.chainFilter.delete(chain);
+    if (!state.chainFilter.size) state.chainFilter = new Set(); // back to all
+  } else {
+    state.chainFilter.add(chain);
+  }
+  renderResults();
+});
+
+/* One delegated handler for the whole find area: sort, expand, star, buy, copy. */
+$("#view-find").addEventListener("click", async (e) => {
+  const sort = e.target.closest("th[data-sort]");
+  if (sort) {
+    const key = sort.dataset.sort;
+    if (state.sortKey === key) state.sortDir *= -1;
+    else { state.sortKey = key; state.sortDir = key === "symbol" ? 1 : -1; }
+    renderResults();
+    return;
+  }
+  if (e.target.closest("#toggle-rejected")) {
+    state.showRejected = !state.showRejected;
+    renderRejected();
+    return;
+  }
+  const star = e.target.closest("[data-star]");
+  if (star) {
+    e.stopPropagation();
+    toggleWatch(star.dataset.star);
+    return;
+  }
+  const buy = e.target.closest("[data-buy]");
+  if (buy) {
+    openBuyDialog(buy.dataset.buy);
+    return;
+  }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+    return;
+  }
+  const row = e.target.closest("tr.row[data-key]");
+  if (row && !e.target.closest("a")) {
+    const key = row.dataset.key;
+    state.expandedKey = state.expandedKey === key ? null : key;
+    renderResults();
+  }
+});
+
+function toggleWatch(key) {
+  const watch = loadWatchlist();
+  if (watch[key]) {
+    delete watch[key];
+    toast("Removed from watchlist");
+  } else {
+    const c = state.passing.find((x) => candidateKey(x) === key);
+    if (!c) return;
+    watch[key] = { key, chain: c.chain, pair_address: c.pair_address, symbol: c.symbol, added_at: Date.now(), last_price: c.price_usd };
+    toast(`Watching ${c.symbol} ★`, "good");
+  }
+  saveWatchlist(watch);
+  if ($("#view-find").classList.contains("active")) renderResults();
+  else renderWatchlist(null);
+}
+
+/* Positions area: expand, remove, note, copy. */
+$("#view-positions").addEventListener("click", async (e) => {
+  const remove = e.target.closest("[data-remove]");
+  if (remove) {
+    const positions = loadPositions();
+    const key = remove.dataset.remove;
+    if (positions[key] && confirm(`Stop tracking ${positions[key].symbol}?`)) {
+      delete positions[key];
+      savePositions(positions);
+      renderBadges();
+      state.posExpandedKey = null;
+      state.signals = (state.signals || []).filter((s) => s.position.key !== key);
+      renderSignals();
+      toast("Stopped tracking");
+    }
+    return;
+  }
+  const saveNote = e.target.closest("[data-save-note]");
+  if (saveNote) {
+    const positions = loadPositions();
+    const p = positions[saveNote.dataset.saveNote];
+    if (p) {
+      p.note = $("#note-input").value.trim();
+      savePositions(positions);
+      toast("Note saved", "good");
+    }
+    return;
+  }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+    return;
+  }
+  const row = e.target.closest("tr.row[data-poskey]");
+  if (row && !e.target.closest("a, input, button")) {
+    const key = row.dataset.poskey;
+    state.posExpandedKey = state.posExpandedKey === key ? null : key;
+    renderSignals();
+  }
+});
+
+/* Watchlist area. */
+$("#view-watch").addEventListener("click", (e) => {
+  const star = e.target.closest("[data-star]");
+  if (star) { toggleWatch(star.dataset.star); return; }
+  const buy = e.target.closest("[data-watch-buy]");
+  if (buy) {
+    const w = loadWatchlist()[buy.dataset.watchBuy];
+    if (w) openManualBuy(w.chain, w.pair_address);
+  }
+});
+
+/* ---------- buy dialog ---------- */
 
 let pendingBuy = null;
 
-$("#find-results").addEventListener("click", (event) => {
-  const btn = event.target.closest("[data-buy]");
-  if (!btn) return;
-  pendingBuy = lastResults[Number(btn.dataset.buy)];
-  $("#buy-hint").textContent =
-    `${pendingBuy.symbol} on ${pendingBuy.chain} — current price ${fmtPrice(pendingBuy.price_usd)}`;
+function openBuyDialog(key) {
+  const c = state.passing.find((x) => candidateKey(x) === key);
+  if (!c) return;
+  pendingBuy = c;
+  $("#buy-hint").textContent = `${c.symbol} on ${c.chain} — current price ${fmtPrice(c.price_usd).replace(/^\$/, "$")}`;
   $("#buy-amount").value = "";
   $("#buy-price").value = "";
   $("#buy-note").value = "";
   $("#dlg-buy").showModal();
-});
+  $("#buy-amount").focus();
+}
 
 $("#buy-save").addEventListener("click", () => {
   const amount = Number($("#buy-amount").value);
-  if (!(amount > 0)) {
-    alert("Enter how much you put in, in dollars.");
-    return;
-  }
+  if (!(amount > 0)) { toast("Enter how much you put in, in dollars", "bad"); return; }
   addPosition(pendingBuy, amount, Number($("#buy-price").value) || 0, $("#buy-note").value);
   $("#dlg-buy").close();
-  alert(`Tracking ${pendingBuy.symbol}. Open "My Positions" and press "Check for sell signals" any time.`);
+  renderBadges();
+  if (state.expandedKey) renderResults();
+  toast(`Tracking ${pendingBuy.symbol} — see the Positions tab`, "good");
 });
 
-$("#pos-results").addEventListener("click", (event) => {
-  const btn = event.target.closest("[data-remove]");
-  if (!btn) return;
-  const positions = loadPositions();
-  const key = btn.dataset.remove;
-  if (positions[key] && confirm(`Stop tracking ${positions[key].symbol}?`)) {
-    delete positions[key];
-    savePositions(positions);
-    doCheck();
-  }
-});
+/* ---------- manual add dialog ---------- */
 
-$("#btn-add-manual").addEventListener("click", () => {
-  $("#man-link").value = "";
+function openManualBuy(chain, pair) {
+  $("#man-link").value = chain && pair ? `https://dexscreener.com/${chain}/${pair}` : "";
   $("#man-amount").value = "";
   $("#man-price").value = "";
   $("#dlg-manual").showModal();
-});
+  (chain ? $("#man-amount") : $("#man-link")).focus();
+}
+
+$("#btn-add-manual").addEventListener("click", () => openManualBuy());
 
 $("#man-save").addEventListener("click", async () => {
   const match = /dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i.exec($("#man-link").value.trim());
-  if (!match) {
-    alert("That doesn't look like a DexScreener link.\nExpected something like:\nhttps://dexscreener.com/solana/ABC123...");
-    return;
-  }
+  if (!match) { toast("That doesn't look like a DexScreener link", "bad"); return; }
   const amount = Number($("#man-amount").value);
-  if (!(amount > 0)) {
-    alert("Enter how much you put in, in dollars.");
-    return;
-  }
+  if (!(amount > 0)) { toast("Enter how much you put in, in dollars", "bad"); return; }
   const btn = $("#man-save");
   btn.disabled = true;
   btn.textContent = "Looking up…";
   const candidate = await fetchPair(match[1].toLowerCase(), match[2]);
   btn.disabled = false;
   btn.textContent = "Add";
-  if (!candidate) {
-    alert("Couldn't find that pair. Check the link, or that you're online.");
-    return;
-  }
+  if (!candidate) { toast("Couldn't find that pair — check the link and your connection", "bad"); return; }
   addPosition(candidate, amount, Number($("#man-price").value) || 0, "");
   $("#dlg-manual").close();
-  doCheck();
+  renderBadges();
+  switchTab("positions");
+  doCheck(true);
+  toast(`Tracking ${candidate.symbol}`, "good");
 });
+
+/* ---------- import / export ---------- */
 
 $("#btn-export").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(loadPositions(), null, 2)], { type: "application/json" });
@@ -1105,46 +1814,127 @@ $("#btn-export").addEventListener("click", () => {
   URL.revokeObjectURL(a.href);
 });
 
+$("#btn-import").addEventListener("click", () => $("#import-file").click());
+
+$("#import-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    const positions = loadPositions();
+    let added = 0;
+    for (const [key, p] of Object.entries(parsed || {})) {
+      if (p && typeof p === "object" && p.key && p.pair_address && Number(p.amount_usd) > 0) {
+        positions[key] = p;
+        added++;
+      }
+    }
+    if (!added) { toast("No valid positions found in that file", "bad"); return; }
+    savePositions(positions);
+    renderBadges();
+    state.signals = null;
+    renderSignals();
+    toast(`Imported ${added} position${added === 1 ? "" : "s"}`, "good");
+  } catch (err) {
+    toast("Couldn't read that file — is it the exported positions.json?", "bad");
+  }
+});
+
+/* ---------- settings ---------- */
+
+function numOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function fillSettings() {
   $("#set-chains").value = CONFIG.discovery.chains.join(", ");
+  $("#set-terms").value = CONFIG.discovery.search_terms.join(", ");
   $("#set-minliq").value = CONFIG.filters.min_liquidity_usd;
   $("#set-minvol").value = CONFIG.filters.min_volume_h24_usd;
+  $("#set-minage").value = CONFIG.filters.min_age_minutes;
+  $("#set-maxage").value = CONFIG.filters.max_age_days;
+  $("#set-fdv").value = CONFIG.filters.max_fdv_to_liquidity_ratio;
+  $("#set-buyratio").value = Math.round(CONFIG.filters.min_buy_ratio_h1 * 100);
   $("#set-tp").value = CONFIG.sell_rules.take_profit_pct;
   $("#set-sl").value = CONFIG.sell_rules.stop_loss_pct;
   $("#set-trail").value = CONFIG.sell_rules.trailing_stop_pct;
   $("#set-liqdrop").value = CONFIG.sell_rules.liquidity_drop_pct;
 }
 
-$("#btn-settings").addEventListener("click", () => {
-  fillSettings();
-  $("#dlg-settings").showModal();
-});
+$("#btn-settings").addEventListener("click", () => { fillSettings(); $("#dlg-settings").showModal(); });
 
 $("#set-save").addEventListener("click", () => {
   const chains = $("#set-chains").value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (!chains.length) {
-    alert("Enter at least one chain, e.g. solana");
-    return;
-  }
+  if (!chains.length) { toast("Enter at least one chain, e.g. solana", "bad"); return; }
+  const terms = $("#set-terms").value.split(",").map((s) => s.trim()).filter(Boolean);
   CONFIG.discovery.chains = chains;
-  CONFIG.filters.min_liquidity_usd = Number($("#set-minliq").value) || 0;
-  CONFIG.filters.min_volume_h24_usd = Number($("#set-minvol").value) || 0;
-  CONFIG.sell_rules.take_profit_pct = Number($("#set-tp").value);
-  CONFIG.sell_rules.stop_loss_pct = Number($("#set-sl").value);
-  CONFIG.sell_rules.trailing_stop_pct = Number($("#set-trail").value);
-  CONFIG.sell_rules.liquidity_drop_pct = Number($("#set-liqdrop").value);
+  CONFIG.discovery.search_terms = terms.length ? terms : DEFAULTS.discovery.search_terms;
+  CONFIG.filters.min_liquidity_usd = numOr($("#set-minliq").value, DEFAULTS.filters.min_liquidity_usd);
+  CONFIG.filters.min_volume_h24_usd = numOr($("#set-minvol").value, DEFAULTS.filters.min_volume_h24_usd);
+  CONFIG.filters.min_age_minutes = numOr($("#set-minage").value, DEFAULTS.filters.min_age_minutes);
+  CONFIG.filters.max_age_days = numOr($("#set-maxage").value, DEFAULTS.filters.max_age_days);
+  CONFIG.filters.max_fdv_to_liquidity_ratio = numOr($("#set-fdv").value, DEFAULTS.filters.max_fdv_to_liquidity_ratio);
+  CONFIG.filters.min_buy_ratio_h1 = clamp(numOr($("#set-buyratio").value, 45) / 100);
+  CONFIG.sell_rules.take_profit_pct = numOr($("#set-tp").value, DEFAULTS.sell_rules.take_profit_pct);
+  CONFIG.sell_rules.stop_loss_pct = numOr($("#set-sl").value, DEFAULTS.sell_rules.stop_loss_pct);
+  CONFIG.sell_rules.trailing_stop_pct = numOr($("#set-trail").value, DEFAULTS.sell_rules.trailing_stop_pct);
+  CONFIG.sell_rules.liquidity_drop_pct = numOr($("#set-liqdrop").value, DEFAULTS.sell_rules.liquidity_drop_pct);
   writeStore(STORE_CONFIG, CONFIG);
   $("#dlg-settings").close();
+  toast("Saved — scan settings apply on the next scan", "good");
 });
 
 $("#set-reset").addEventListener("click", () => {
   CONFIG = JSON.parse(JSON.stringify(DEFAULTS));
   writeStore(STORE_CONFIG, CONFIG);
   fillSettings();
+  toast("Settings reset to defaults");
 });
 
-renderPositionCount();
-renderSignals([]);
+/* ---------- dialogs: shared close behavior ---------- */
+
+$$("dialog").forEach((dlg) => {
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+  dlg.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", () => dlg.close()));
+});
+
+/* ---------- keyboard ---------- */
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "/") { e.preventDefault(); switchTab("find"); $("#search").focus(); }
+  else if (e.key === "1") switchTab("find");
+  else if (e.key === "2") switchTab("watch");
+  else if (e.key === "3") switchTab("positions");
+});
+
+/* ---------- auto refresh ---------- */
+
+let autoScanTimer = null;
+let autoCheckTimer = null;
+
+function applyAutoTimers() {
+  clearInterval(autoScanTimer);
+  clearInterval(autoCheckTimer);
+  if (PREFS.autoScan) autoScanTimer = setInterval(() => { if (!document.hidden) doScan(); }, 120000);
+  if (PREFS.autoCheck) autoCheckTimer = setInterval(() => { if (!document.hidden) doCheck(true); }, 60000);
+}
+
+$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); applyAutoTimers(); });
+$("#auto-check").addEventListener("change", (e) => { PREFS.autoCheck = e.target.checked; savePrefs(); applyAutoTimers(); });
+
+/* ---------- init ---------- */
+
+hydrateScan();
+renderBadges();
+renderResults();
+$("#auto-scan").checked = !!PREFS.autoScan;
+$("#auto-check").checked = !!PREFS.autoCheck;
+applyAutoTimers();
+setInterval(renderScanAge, 30000);
+if (PREFS.tab && PREFS.tab !== "find") switchTab(PREFS.tab);
 </script>
 </body>
 </html>
