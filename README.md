@@ -16,7 +16,13 @@ It **places no orders and holds no funds**. There is no wallet, no private key, 
 Double-click **`Coin Finder.html`**. It opens in your browser and works with no
 Python, no installer, and no setup. Positions are saved in that browser.
 
-What it does: sortable/searchable scan results with chain filter chips, a
+What it does: buy-now pick cards (a stricter cut above the filters, with
+plain-English reasons and a stop/target entry plan), a Learn tab (score
+explainer, tap-to-explain red flags, pre-buy checklist, risk-based position
+sizing that the buy dialog computes from your bankroll), a copy-address
+handoff for trading in FOMO (which has no public API to connect accounts —
+nothing here asks for a FOMO login), sortable/searchable scan results with
+chain filter chips, a
 click-to-expand score breakdown (the six components as meters, so no score is a
 black box), a watchlist for coins you're not ready to buy, portfolio stat tiles
 and per-position price sparklines, note-taking on positions, import/export,

@@ -280,7 +280,55 @@
     padding: 1px 6px;
     margin: 1px 3px 1px 0;
     display: inline-block;
+    cursor: pointer;
   }
+  .flag:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ---------- buy-now picks ---------- */
+
+  .picks-head { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; }
+  .picks-head h2 { font-size: 14px; margin: 0; }
+  .picks-head span { color: var(--faint); font-size: 12px; }
+  .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .pick {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--good);
+    border-radius: var(--radius);
+    padding: 13px 15px;
+  }
+  .pick .p-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .pick .p-top .sym { font-size: 15px; }
+  .pick .why { margin: 6px 0; padding-left: 16px; font-size: 12.5px; color: var(--muted); }
+  .pick .why li { margin: 2px 0; }
+  .pick .plan {
+    font-size: 12.5px;
+    background: var(--panel-2);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    margin: 8px 0;
+    color: var(--muted);
+  }
+  .pick .plan b { color: var(--text); }
+  .pick .p-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+  /* ---------- learn tab ---------- */
+
+  .learn { max-width: 760px; }
+  .learn section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+  }
+  .learn h2 { font-size: 15px; margin: 0 0 8px; }
+  .learn p, .learn li { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+  .learn p b, .learn li b { color: var(--text); }
+  .learn ul, .learn ol { padding-left: 20px; margin: 6px 0; }
+  .learn dl { margin: 0; }
+  .learn dt { font-weight: 600; font-size: 13.5px; margin-top: 10px; }
+  .learn dd { margin: 2px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
 
   /* expanded detail row */
   tr.detail td { background: var(--panel-2); padding: 0; }
@@ -402,6 +450,7 @@
     <button data-view="find" class="active">Find</button>
     <button data-view="watch">Watchlist<span class="badge" id="watch-count"></span></button>
     <button data-view="positions">Positions<span class="badge" id="pos-count"></span></button>
+    <button data-view="learn">Learn</button>
   </div>
   <div class="spacer"></div>
   <span class="header-meta" id="scan-age"></span>
@@ -419,8 +468,13 @@
     </div>
     <div class="tiles" id="find-tiles" hidden></div>
     <div id="find-status"></div>
+    <div id="find-picks"></div>
     <div id="find-results"></div>
     <div id="rejected-block"></div>
+  </section>
+
+  <section id="view-learn" class="view">
+    <div id="learn-content" class="learn"></div>
   </section>
 
   <section id="view-watch" class="view">
@@ -450,7 +504,7 @@
 <footer>
   This tool only suggests. It never places a trade, holds funds, or touches your wallet —
   you make every buy and sell yourself in FOMO. Scores are heuristics, not predictions.
-  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> tabs · <kbd>Esc</kbd> close.
+  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> tabs · <kbd>Esc</kbd> close.
 </footer>
 
 <div id="toasts"></div>
@@ -460,6 +514,7 @@
   <p class="hint" id="buy-hint"></p>
   <label for="buy-amount">How much did you put in? (USD)</label>
   <input id="buy-amount" type="number" min="0" step="any" placeholder="250">
+  <p class="hint" id="buy-suggest" style="margin:8px 0 0"></p>
   <label for="buy-price">Entry price (blank = current price)</label>
   <input id="buy-price" type="number" min="0" step="any" placeholder="current">
   <label for="buy-note">Note (optional)</label>
@@ -485,6 +540,12 @@
   </div>
 </dialog>
 
+<dialog id="dlg-explain">
+  <h2 id="explain-term"></h2>
+  <p class="hint" id="explain-text" style="margin-top:10px"></p>
+  <div class="dlg-row"><button data-close class="ghost">Close</button></div>
+</dialog>
+
 <dialog id="dlg-settings">
   <h2>Settings</h2>
   <p class="hint">Stored in this browser. Scan settings apply on the next scan.</p>
@@ -505,6 +566,9 @@
     <div><label for="set-maxage">Max age (days)</label><input id="set-maxage" type="number" min="0" step="any"></div>
     <div><label for="set-fdv">Max FDV ÷ liquidity</label><input id="set-fdv" type="number" min="0" step="any"></div>
     <div><label for="set-buyratio">Min 1h buys (%)</label><input id="set-buyratio" type="number" min="0" max="100" step="any"></div>
+    <div class="settings-section">Position sizing (optional)</div>
+    <div><label for="set-bankroll">Bankroll ($)</label><input id="set-bankroll" type="number" min="0" step="any" placeholder="e.g. 1000"></div>
+    <div><label for="set-risk">Risk per trade (%)</label><input id="set-risk" type="number" min="0.1" max="100" step="any" placeholder="1"></div>
     <div class="settings-section">Sell rules</div>
     <div><label for="set-tp">Take profit (%)</label><input id="set-tp" type="number" step="any"></div>
     <div><label for="set-sl">Stop loss (%)</label><input id="set-sl" type="number" step="any"></div>
@@ -1129,10 +1193,141 @@ function meterRow(label, value) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Glossary — every flag and reject reason, tap-to-explain
+ * ------------------------------------------------------------------ */
+
+const GLOSSARY = [
+  [/thin liquidity/i, "Thin liquidity",
+   "The pool backing this coin holds little money. Even a modest sell moves the price against you, and getting OUT of a big position may be impossible at anything near the shown price. Deeper pools = easier exits."],
+  [/no socials\/website/i, "No socials or website",
+   "The token lists no Twitter/Telegram/website. Serious projects almost always have at least one. Absence isn't proof of a scam, but anonymous tokens rug more often — treat it as a real warning."],
+  [/FDV .*liquidity|FDV\/liquidity/i, "FDV vs liquidity",
+   "FDV (fully diluted value) is what ALL tokens would be worth at this price. When FDV is huge compared to the pool's actual money, the price is propped up by very little — insiders can dump into that thin pool and crater it. Lower ratios are healthier."],
+  [/24h net selling/i, "Net selling",
+   "Over the last 24 hours more trades sold than bought. Someone is distributing. Momentum can still carry it, but you'd be buying what others are steadily exiting."],
+  [/volume fading/i, "Volume fading",
+   "The last hour's trading is far below the day's average — attention is leaving. Meme coins live on attention; when it fades, price usually follows."],
+  [/already pumped/i, "Already pumped",
+   "This coin already made a huge move in the last hour. Chasing a spike usually means buying near the top from people who bought earlier — the risk/reward has flipped against you."],
+  [/paid boost/i, "Paid boost",
+   "Someone PAID the listing site to promote this token. That's marketing, not organic interest. Sometimes it precedes real attention; often it decorates an exit."],
+  [/liquidity \$[\d,]+ </i, "Rejected: liquidity too low",
+   "The pool is below your minimum. You could get in, but getting out at a fair price would be hard. Raise or lower the bar in Settings."],
+  [/24h volume \$[\d,]+ </i, "Rejected: not enough trading",
+   "Too little was traded in 24 hours. Dead volume means wide spreads and no exit. Adjustable in Settings."],
+  [/age \d+m </i, "Rejected: too new",
+   "Minutes-old pairs are where most rugs happen — liquidity gets pulled before anyone can react. The minimum age filter dodges the most dangerous window."],
+  [/age [\d.]+d >/i, "Rejected: too old",
+   "Past your maximum age this isn't an early meme play anymore. The window where these coins make their fast moves has usually passed."],
+  [/buy ratio/i, "Rejected: sellers dominate",
+   "Fewer than your minimum share of recent trades were buys. You'd be catching what others are throwing."],
+];
+
+function explainTerm(text) {
+  for (const [re, term, explanation] of GLOSSARY) {
+    if (re.test(text)) {
+      $("#explain-term").textContent = term;
+      $("#explain-text").textContent = explanation;
+      openDialog($("#dlg-explain"));
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Capture phase so a flag tap explains itself instead of toggling the row. */
+document.addEventListener("click", (e) => {
+  const flag = e.target.closest(".flag");
+  if (flag && explainTerm(flag.textContent)) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+/* ------------------------------------------------------------------ *
+ * Buy-now picks
+ * ------------------------------------------------------------------ */
+
+/* Stricter than "passed the filters": these gates are what separates
+   "tradeable" from "worth opening FOMO for right now". */
+function pickCandidates() {
+  return state.passing.filter((c) => {
+    const b = c.score_breakdown || {};
+    return c.score >= 60
+      && (b.safety || 0) >= 0.55
+      && (b.momentum || 0) >= 0.25
+      && (b.buy_pressure || 0) >= 0.2
+      && c.liquidity_usd >= 30000
+      && !(c.flags || []).some((f) => f.indexOf("already pumped") === 0);
+  }).slice(0, 3);
+}
+
+function pickWhy(c) {
+  const b = c.score_breakdown || {};
+  const lines = [];
+  if ((b.momentum || 0) >= 0.4)
+    lines.push(`Moving: ${c.price_change_h1 >= 0 ? "+" : ""}${c.price_change_h1.toFixed(0)}% last hour, ${c.price_change_h6 >= 0 ? "+" : ""}${c.price_change_h6.toFixed(0)}% over 6h`);
+  if ((b.buy_pressure || 0) >= 0.4)
+    lines.push(`Buyers in control: ${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys (${c.buys_h1} vs ${c.sells_h1})`);
+  if ((b.turnover || 0) >= 0.5)
+    lines.push(`Heavy trading: 24h volume is ${c.turnover_ratio.toFixed(1)}× the pool`);
+  if ((b.liquidity || 0) >= 0.5)
+    lines.push(`Exitable: ${fmtCompact(c.liquidity_usd)} pool depth`);
+  if ((b.safety || 0) >= 0.8 && !(c.flags || []).length)
+    lines.push("No red flags raised");
+  return lines.slice(0, 3);
+}
+
+function renderPicks() {
+  const target = $("#find-picks");
+  if (!state.scannedAt) { target.innerHTML = ""; return; }
+  const picks = pickCandidates();
+  const sl = CONFIG.sell_rules.stop_loss_pct;
+  const tp = CONFIG.sell_rules.take_profit_pct;
+
+  if (!picks.length) {
+    target.innerHTML = `<div class="picks-head"><h2>Buy-now picks</h2>
+      <span>nothing clears the bar this scan — that's normal, most scans deserve zero buys</span></div>`;
+    return;
+  }
+
+  const cards = picks.map((c) => {
+    const key = candidateKey(c);
+    const tracked = !!loadPositions()[key];
+    const stop = c.price_usd * (1 + sl / 100);
+    const target_ = c.price_usd * (1 + tp / 100);
+    const why = pickWhy(c).map((w) => `<li>${escapeHtml(w)}</li>`).join("");
+    const cautions = (c.flags || []).map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("");
+    return `<div class="pick">
+      <div class="p-top">
+        <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+        <span class="sym">${escapeHtml(c.symbol)}</span>
+        <span class="chain-tag">${escapeHtml(c.chain)}</span>
+        <span class="spacer"></span>
+        <span class="num" style="font-variant-numeric:tabular-nums">${fmtPrice(c.price_usd)}</span>
+      </div>
+      <ul class="why">${why}</ul>
+      ${cautions ? `<div>${cautions}</div>` : ""}
+      <div class="plan">If you buy at ${fmtPrice(c.price_usd)}: stop out at <b>${fmtPrice(stop)}</b> (${sl}%),
+        take profit at <b>${fmtPrice(target_)}</b> (+${tp}%). The Positions tab watches both for you.</div>
+      <div class="p-actions">
+        <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy address for FOMO</button>
+        <button class="small primary" data-buy="${escapeHtml(key)}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
+        <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  target.innerHTML = `<div class="picks-head"><h2>Buy-now picks</h2>
+    <span>the scan's strongest entries — suggestions, not financial advice</span></div>
+    <div class="picks">${cards}</div>`;
+}
+
+/* ------------------------------------------------------------------ *
  * App state
  * ------------------------------------------------------------------ */
 
-let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2 }, readStore(STORE_PREFS, {}));
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1 }, readStore(STORE_PREFS, {}));
 // v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
 if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
 function savePrefs() { writeStore(STORE_PREFS, PREFS); }
@@ -1267,6 +1462,7 @@ function detailRowHtml(c, colspan) {
 function renderResults() {
   renderChainChips();
   renderFindTiles();
+  renderPicks();
   const target = $("#find-results");
 
   if (!state.scannedAt) {
@@ -1481,6 +1677,74 @@ function renderWatchlist(priced) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Learn tab
+ * ------------------------------------------------------------------ */
+
+function renderLearn() {
+  const el = $("#learn-content");
+  if (el.dataset.built) return;
+  el.dataset.built = "1";
+  const g = GLOSSARY.slice(0, 7)  // the scoring flags; reject reasons repeat the same ideas
+    .map(([, term, text]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(text)}</dd>`).join("");
+  el.innerHTML = `
+  <section>
+    <h2>How the score works</h2>
+    <p>Every coin that survives the safety filters gets a 0–100 score from six parts.
+       Click any row in Find to see its six meters — <b>no score is a black box</b>.</p>
+    <ul>
+      <li><b>Momentum (25%)</b> — is the price moving up right now? A blend of the last hour and last 6 hours. Crashing scores near zero; a huge finished pump also scores LOW, because you'd be late.</li>
+      <li><b>Turnover (20%)</b> — how much the coin trades compared to its pool size. High turnover = real, active interest.</li>
+      <li><b>Buy pressure (20%)</b> — what share of recent trades are buys, discounted when there are too few trades to mean anything.</li>
+      <li><b>Liquidity (15%)</b> — how much money backs the pool. This is what decides whether you can EXIT.</li>
+      <li><b>Age fit (10%)</b> — old enough to have dodged the instant-rug window, young enough to still be a meme play.</li>
+      <li><b>Safety (10%)</b> — starts perfect and loses points for each red flag below.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Red flags, in plain words</h2>
+    <p>These appear as small tags on coins. <b>Tap any tag anywhere in the app</b> and it explains itself.</p>
+    <dl>${g}</dl>
+  </section>
+  <section>
+    <h2>Before you buy — 60-second checklist</h2>
+    <ol>
+      <li><b>Open the chart</b> (Chart ↗). Is the rise steady, or one vertical candle? Vertical = you're late.</li>
+      <li><b>Read the flags.</b> One flag is normal; three is a story.</li>
+      <li><b>Check you could exit:</b> your position should be a small fraction of the pool — under 1% of liquidity is comfortable.</li>
+      <li><b>Decide your exit BEFORE entering.</b> The pick card shows the stop and target prices — if you wouldn't honor the stop, don't enter.</li>
+      <li><b>Size it</b> so the stop loss costs an amount you're okay losing (see below).</li>
+      <li><b>Log it</b> with "I bought this" so the exit rules actually watch it.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Position sizing — the one rule that keeps you alive</h2>
+    <p>Risk a <b>fixed small slice of your bankroll per trade</b> — 1% is the classic. The math:
+       size = (bankroll × risk%) ÷ stop distance. With a $1,000 bankroll, 1% risk and this app's
+       25% stop loss, that's $1,000 × 1% ÷ 25% = <b>$40 per trade</b>. Ten straight losers — which
+       WILL happen in meme coins — costs 10%, not everything.</p>
+    <p>Set your bankroll and risk in <b>Settings → Position sizing</b> and the buy dialog computes this for you.</p>
+  </section>
+  <section>
+    <h2>Trading on FOMO — the honest version</h2>
+    <p>FOMO has <b>no public way for another app to connect to your account</b>, so nothing here can
+       (or should) log into it — be suspicious of anything that asks for your FOMO login. The flow instead:</p>
+    <ol>
+      <li>Tap <b>Copy address for FOMO</b> on a pick.</li>
+      <li>Open FOMO, paste the address into its search, and trade there.</li>
+      <li>Come back and tap <b>I bought this</b> — the Positions tab then watches your exits.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>What this app cannot see</h2>
+    <p>The score reads market data only. It <b>cannot detect</b>: honeypots (coins you can buy but not sell),
+       unlocked liquidity a deployer can pull, insider wallets holding most of the supply, or coordinated
+       pump groups. For coins you're sizing up seriously, check the token on a scanner like rugcheck
+       or the audit tabs on the chart page. And the oldest rule: <b>never trade money you can't lose to zero</b> —
+       most meme coins go there.</p>
+  </section>`;
+}
+
+/* ------------------------------------------------------------------ *
  * Shared bits
  * ------------------------------------------------------------------ */
 
@@ -1691,6 +1955,7 @@ function switchTab(name) {
     if (!state.signals && Object.keys(loadPositions()).length) doCheck(true);
   }
   if (name === "watch") renderWatchlist(null);
+  if (name === "learn") renderLearn();
 }
 
 $("#tabs").addEventListener("click", (e) => {
@@ -1849,6 +2114,13 @@ $("#view-watch").addEventListener("click", (e) => {
 
 let pendingBuy = null;
 
+function suggestedSize() {
+  const sl = Math.abs(CONFIG.sell_rules.stop_loss_pct);
+  if (!(PREFS.bankroll > 0) || !(sl > 0)) return 0;
+  // Size so that hitting the stop loss costs risk_pct of the bankroll.
+  return (PREFS.bankroll * (PREFS.risk_pct / 100)) / (sl / 100);
+}
+
 function openBuyDialog(key) {
   const c = state.passing.find((x) => candidateKey(x) === key);
   if (!c) return;
@@ -1857,6 +2129,13 @@ function openBuyDialog(key) {
   $("#buy-amount").value = "";
   $("#buy-price").value = "";
   $("#buy-note").value = "";
+  const size = suggestedSize();
+  $("#buy-suggest").innerHTML = size > 0
+    ? `Suggested size: <b>$${size.toFixed(2)}</b> — risks ${PREFS.risk_pct}% of your $${PREFS.bankroll.toLocaleString()} bankroll if the ${CONFIG.sell_rules.stop_loss_pct}% stop hits.
+       <button class="small ghost" id="buy-use-suggest" type="button">Use it</button>`
+    : `Tip: set your bankroll in Settings → Position sizing to get a suggested size here.`;
+  const use = $("#buy-use-suggest");
+  if (use) use.addEventListener("click", () => { $("#buy-amount").value = size.toFixed(2); });
   openDialog($("#dlg-buy"));
   $("#buy-amount").focus();
 }
@@ -1957,6 +2236,8 @@ function fillSettings() {
   $("#set-maxage").value = CONFIG.filters.max_age_days;
   $("#set-fdv").value = CONFIG.filters.max_fdv_to_liquidity_ratio;
   $("#set-buyratio").value = Math.round(CONFIG.filters.min_buy_ratio_h1 * 100);
+  $("#set-bankroll").value = PREFS.bankroll || "";
+  $("#set-risk").value = PREFS.risk_pct;
   $("#set-tp").value = CONFIG.sell_rules.take_profit_pct;
   $("#set-sl").value = CONFIG.sell_rules.stop_loss_pct;
   $("#set-trail").value = CONFIG.sell_rules.trailing_stop_pct;
@@ -1981,6 +2262,9 @@ $("#set-save").addEventListener("click", () => {
   CONFIG.sell_rules.stop_loss_pct = numOr($("#set-sl").value, DEFAULTS.sell_rules.stop_loss_pct);
   CONFIG.sell_rules.trailing_stop_pct = numOr($("#set-trail").value, DEFAULTS.sell_rules.trailing_stop_pct);
   CONFIG.sell_rules.liquidity_drop_pct = numOr($("#set-liqdrop").value, DEFAULTS.sell_rules.liquidity_drop_pct);
+  PREFS.bankroll = Math.max(0, numOr($("#set-bankroll").value, 0));
+  PREFS.risk_pct = Math.min(100, Math.max(0.1, numOr($("#set-risk").value, 1)));
+  savePrefs();
   writeStore(STORE_CONFIG, CONFIG);
   closeDialog($("#dlg-settings"));
   toast("Saved — scan settings apply on the next scan", "good");
@@ -2026,6 +2310,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "1") switchTab("find");
   else if (e.key === "2") switchTab("watch");
   else if (e.key === "3") switchTab("positions");
+  else if (e.key === "4") switchTab("learn");
 });
 
 /* ---------- auto refresh ---------- */
