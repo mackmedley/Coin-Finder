@@ -69,12 +69,20 @@ class DexScreenerClient:
         return []
 
     def get_pair(self, chain: str, pair_address: str) -> dict[str, Any] | None:
-        """Fetch one pair's current state. Used to re-price open positions."""
+        """Fetch one pair's current state. Used to re-price open positions.
+
+        This endpoint has two response shapes in the wild: a `pairs` list, and a
+        singular `pair` object (with `pairs` sometimes null alongside it). Accept
+        both — getting this wrong silently reports every position as stale.
+        """
         payload = self._fast.get_json(f"{BASE}/latest/dex/pairs/{chain}/{pair_address}")
-        pairs = payload.get("pairs") if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            return None
+        pairs = payload.get("pairs")
         if isinstance(pairs, list) and pairs and isinstance(pairs[0], dict):
             return pairs[0]
-        return None
+        single = payload.get("pair")
+        return single if isinstance(single, dict) else None
 
 
 def discover(client: DexScreenerClient, config: dict[str, Any]) -> list[Candidate]:

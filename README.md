@@ -155,7 +155,7 @@ The provider is isolated behind `coinfinder/datasources/`, so adding Birdeye, Ge
 python3 -m pytest tests -q
 ```
 
-30 tests covering filters, every scoring component, all sell rules, position persistence, and config validation. They run against synthetic fixtures and make no network calls.
+37 tests covering filters, every scoring component, all sell rules, position persistence, config validation, and provider response-shape handling. They run against synthetic fixtures and make no network calls.
 
 ---
 
