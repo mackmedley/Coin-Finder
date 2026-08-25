@@ -312,6 +312,39 @@
   .pick .plan b { color: var(--text); }
   .pick .p-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* ---------- feed tab ---------- */
+
+  .feed-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 860px) { .feed-cols { grid-template-columns: 1fr; } }
+  .feed-sec {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .feed-sec h2 {
+    font-size: 12px;
+    margin: 0 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .feed-sec h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); font-size: 11.5px; }
+  .feed-item { padding: 8px 0; }
+  .feed-item + .feed-item { border-top: 1px solid var(--line-soft); }
+  .feed-item a { color: var(--text); text-decoration: none; font-size: 13.5px; line-height: 1.45; }
+  .feed-item a:hover { color: var(--accent); }
+  .feed-meta { font-size: 11.5px; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .trend-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13.5px; }
+  .trend-row + .trend-row { border-top: 1px solid var(--line-soft); }
+  .trend-rank { color: var(--faint); font-size: 11px; min-width: 15px; text-align: right; }
+  .trend-row img { width: 20px; height: 20px; border-radius: 50%; }
+  .feed-err { color: var(--faint); font-size: 12.5px; padding: 6px 0; }
+
   /* ---------- learn tab ---------- */
 
   .learn { max-width: 760px; }
@@ -450,6 +483,7 @@
     <button data-view="find" class="active">Find</button>
     <button data-view="watch">Watchlist<span class="badge" id="watch-count"></span></button>
     <button data-view="positions">Positions<span class="badge" id="pos-count"></span></button>
+    <button data-view="feed">Feed</button>
     <button data-view="learn">Learn</button>
   </div>
   <div class="spacer"></div>
@@ -471,6 +505,26 @@
     <div id="find-picks"></div>
     <div id="find-results"></div>
     <div id="rejected-block"></div>
+  </section>
+
+  <section id="view-feed" class="view">
+    <div class="toolbar">
+      <button id="btn-feed-refresh" class="primary">Refresh feed</button>
+      <span class="header-meta" id="feed-updated"></span>
+      <div class="spacer"></div>
+      <span class="header-meta">Public feeds, read-only — nothing is posted anywhere.</span>
+    </div>
+    <div class="tiles" id="feed-tiles" hidden></div>
+    <div class="feed-cols">
+      <div>
+        <div class="feed-sec" id="feed-news"></div>
+        <div class="feed-sec" id="feed-reddit"></div>
+      </div>
+      <div>
+        <div class="feed-sec" id="feed-trending"></div>
+        <div class="feed-sec" id="feed-profiles"></div>
+      </div>
+    </div>
   </section>
 
   <section id="view-learn" class="view">
@@ -504,7 +558,7 @@
 <footer>
   This tool only suggests. It never places a trade, holds funds, or touches your wallet —
   you make every buy and sell yourself in FOMO. Scores are heuristics, not predictions.
-  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> tabs · <kbd>Esc</kbd> close.
+  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd>–<kbd>5</kbd> tabs · <kbd>Esc</kbd> close.
 </footer>
 
 <div id="toasts"></div>
@@ -1677,6 +1731,169 @@ function renderWatchlist(priced) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Feed tab — read-only public signals, meme-coin focused
+ *
+ * Every source loads independently and fails independently: a blocked or
+ * down feed shows a one-line note in its own section, never an error page.
+ * ------------------------------------------------------------------ */
+
+const FEED = { loadedAt: 0, loading: false, mood: null, trending: null, news: null, reddit: null, profiles: null, showAllNews: false };
+
+const MEME_RE = /meme|doge|shiba?|pepe|bonk|\bwif\b|floki|\binu\b|frog coin|moon ?shot|pump\.?fun|degen|fartcoin|\bcat coin\b/i;
+
+function newsIsMeme(item) {
+  return MEME_RE.test(`${item.title || ""} ${item.categories || ""} ${item.body || ""}`);
+}
+
+async function loadFeed(force) {
+  if (FEED.loading) return;
+  if (!force && FEED.loadedAt && Date.now() - FEED.loadedAt < 5 * 60 * 1000) { renderFeed(); return; }
+  FEED.loading = true;
+  const btn = $("#btn-feed-refresh");
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  renderFeed(true);
+
+  const jobs = {
+    mood: getJson("https://api.alternative.me/fng/?limit=1"),
+    trending: getJson("https://api.coingecko.com/api/v3/search/trending"),
+    news: getJson("https://min-api.cryptocompare.com/data/v2/news/?lang=EN"),
+    reddit1: getJson("https://www.reddit.com/r/CryptoMoonShots/hot.json?limit=15&raw_json=1"),
+    reddit2: getJson("https://www.reddit.com/r/memecoins/hot.json?limit=15&raw_json=1"),
+    profiles: getJson(API + "/token-profiles/latest/v1"),
+  };
+  const out = {};
+  await Promise.all(Object.entries(jobs).map(async ([name, p]) => {
+    try { out[name] = await p; } catch (err) { out[name] = null; }
+  }));
+
+  FEED.mood = out.mood && Array.isArray(out.mood.data) && out.mood.data[0] ? out.mood.data[0] : null;
+  FEED.trending = out.trending && Array.isArray(out.trending.coins)
+    ? out.trending.coins.map((c) => c.item).filter(Boolean).slice(0, 10) : null;
+  FEED.news = out.news && Array.isArray(out.news.Data) ? out.news.Data.slice(0, 40) : null;
+
+  const posts = [];
+  const seen = new Set();  // cross-posts appear in both subs — keep one
+  for (const key of ["reddit1", "reddit2"]) {
+    const children = out[key] && out[key].data && Array.isArray(out[key].data.children) ? out[key].data.children : null;
+    if (!children) continue;
+    for (const ch of children) {
+      if (!ch || !ch.data || ch.data.stickied) continue;
+      const id = ch.data.permalink || ch.data.title;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      posts.push(ch.data);
+    }
+  }
+  FEED.reddit = (out.reddit1 || out.reddit2) ? posts.sort((a, b) => b.score - a.score).slice(0, 12) : null;
+  FEED.profiles = Array.isArray(out.profiles) ? out.profiles.slice(0, 10) : null;
+
+  FEED.loadedAt = Date.now();
+  FEED.loading = false;
+  btn.disabled = false;
+  btn.textContent = "Refresh feed";
+  renderFeed();
+}
+
+function feedSection(title, sub, bodyHtml) {
+  return `<h2>${title}${sub ? `<span class="sub">${sub}</span>` : ""}</h2>${bodyHtml}`;
+}
+
+const FEED_ERR = `<div class="feed-err">Couldn't load this source right now — it may be down or blocked on this network. Refresh to retry.</div>`;
+const FEED_WAIT = `<div class="feed-err">Loading…</div>`;
+
+function renderFeed(loading) {
+  const tiles = $("#feed-tiles");
+  $("#feed-updated").textContent = FEED.loadedAt ? "Updated " + relTime(FEED.loadedAt) : "";
+
+  if (FEED.mood || FEED.news || FEED.trending) {
+    const memeCount = FEED.news ? FEED.news.filter(newsIsMeme).length : 0;
+    const moodValue = FEED.mood ? Number(FEED.mood.value) : null;
+    const moodClass = moodValue == null ? "" : moodValue >= 70 ? "t-delta down" : moodValue <= 30 ? "t-delta down" : "t-delta";
+    tiles.hidden = false;
+    tiles.innerHTML = `
+      <div class="tile"><div class="t-label">Market mood</div>
+        <div class="t-value">${FEED.mood ? escapeHtml(FEED.mood.value_classification) : "—"}</div>
+        ${FEED.mood ? `<div class="${moodClass}" style="color:var(--muted)">${moodValue}/100 — extremes often mark turns</div>` : ""}</div>
+      <div class="tile"><div class="t-label">Meme headlines</div><div class="t-value">${FEED.news ? memeCount : "—"}</div></div>
+      <div class="tile"><div class="t-label">Hot on Reddit</div><div class="t-value">${FEED.reddit ? FEED.reddit.length : "—"}</div></div>
+      <div class="tile"><div class="t-label">Top trending search</div>
+        <div class="t-value" style="font-size:17px">${FEED.trending && FEED.trending[0] ? escapeHtml(FEED.trending[0].symbol || FEED.trending[0].name || "—") : "—"}</div></div>`;
+  } else {
+    tiles.hidden = true;
+  }
+
+  // Headlines — meme-filtered by default
+  let newsBody;
+  if (loading && !FEED.news) newsBody = FEED_WAIT;
+  else if (!FEED.news) newsBody = FEED_ERR;
+  else {
+    const memeItems = FEED.news.filter(newsIsMeme);
+    const useMeme = !FEED.showAllNews && memeItems.length >= 3;
+    const items = (useMeme ? memeItems : FEED.news).slice(0, 14);
+    newsBody = items.map((n) => `
+      <div class="feed-item">
+        <a href="${escapeHtml(n.url || "#")}" target="_blank" rel="noopener">${escapeHtml(n.title || "")}</a>
+        <div class="feed-meta">
+          ${newsIsMeme(n) ? `<span class="flag" style="cursor:default">meme</span>` : ""}
+          <span>${escapeHtml((n.source_info && n.source_info.name) || n.source || "")}</span>
+          <span>${n.published_on ? relTime(n.published_on * 1000) : ""}</span>
+        </div>
+      </div>`).join("");
+    newsBody += `<div class="feed-item"><button class="small ghost" id="news-toggle">${useMeme ? `Show all crypto news (${FEED.news.length})` : memeItems.length ? `Show meme coverage only (${memeItems.length})` : "Few meme-specific headlines right now — showing all"}</button></div>`;
+  }
+  $("#feed-news").innerHTML = feedSection("Headlines", "meme coverage first", newsBody);
+
+  // Reddit
+  let redditBody;
+  if (loading && !FEED.reddit) redditBody = FEED_WAIT;
+  else if (!FEED.reddit) redditBody = FEED_ERR;
+  else if (!FEED.reddit.length) redditBody = `<div class="feed-err">Nothing hot right now.</div>`;
+  else redditBody = FEED.reddit.map((p) => `
+    <div class="feed-item">
+      <a href="https://www.reddit.com${escapeHtml(p.permalink || "")}" target="_blank" rel="noopener">${escapeHtml(p.title || "")}</a>
+      <div class="feed-meta"><span>r/${escapeHtml(p.subreddit || "")}</span><span>▲ ${Number(p.score) || 0}</span><span>${p.created_utc ? relTime(p.created_utc * 1000) : ""}</span></div>
+    </div>`).join("");
+  $("#feed-reddit").innerHTML = feedSection("Meme-coin Reddit", "r/CryptoMoonShots + r/memecoins — crowd chatter, not advice", redditBody);
+
+  // Trending searches
+  let trendBody;
+  if (loading && !FEED.trending) trendBody = FEED_WAIT;
+  else if (!FEED.trending) trendBody = FEED_ERR;
+  else trendBody = FEED.trending.map((t, i) => `
+    <div class="trend-row">
+      <span class="trend-rank">${i + 1}</span>
+      ${t.thumb ? `<img src="${escapeHtml(t.thumb)}" alt="" onerror="this.style.display='none'">` : ""}
+      <b>${escapeHtml(t.symbol || "")}</b>
+      <span style="color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(t.name || "")}</span>
+      ${MEME_RE.test(`${t.name} ${t.symbol}`) ? `<span class="flag" style="cursor:default">meme</span>` : ""}
+    </div>`).join("");
+  $("#feed-trending").innerHTML = feedSection("Trending searches", "what the crowd is looking up — meme runs start here", trendBody);
+
+  // New promoted tokens
+  let profBody;
+  if (loading && !FEED.profiles) profBody = FEED_WAIT;
+  else if (!FEED.profiles) profBody = FEED_ERR;
+  else profBody = FEED.profiles.map((p) => {
+    const address = String(p.tokenAddress || "");
+    const description = String(p.description || "").slice(0, 90);
+    return `<div class="feed-item">
+      <a href="${escapeHtml(p.url || "#")}" target="_blank" rel="noopener">${escapeHtml(address.slice(0, 10))}… on ${escapeHtml(p.chainId || "?")}</a>
+      ${description ? `<div class="feed-meta">${escapeHtml(description)}</div>` : ""}
+    </div>`;
+  }).join("");
+  $("#feed-profiles").innerHTML = feedSection("Just promoted", "tokens that PAID for a profile — marketing, and sometimes an early tell", profBody);
+}
+
+$("#btn-feed-refresh").addEventListener("click", () => loadFeed(true));
+$("#view-feed").addEventListener("click", (e) => {
+  if (e.target.closest("#news-toggle")) {
+    FEED.showAllNews = !FEED.showAllNews;
+    renderFeed();
+  }
+});
+
+/* ------------------------------------------------------------------ *
  * Learn tab
  * ------------------------------------------------------------------ */
 
@@ -1956,6 +2173,7 @@ function switchTab(name) {
   }
   if (name === "watch") renderWatchlist(null);
   if (name === "learn") renderLearn();
+  if (name === "feed") loadFeed(false);
 }
 
 $("#tabs").addEventListener("click", (e) => {
@@ -2310,7 +2528,8 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "1") switchTab("find");
   else if (e.key === "2") switchTab("watch");
   else if (e.key === "3") switchTab("positions");
-  else if (e.key === "4") switchTab("learn");
+  else if (e.key === "4") switchTab("feed");
+  else if (e.key === "5") switchTab("learn");
 });
 
 /* ---------- auto refresh ---------- */
