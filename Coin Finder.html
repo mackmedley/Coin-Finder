@@ -60,6 +60,7 @@
     flex-wrap: wrap;
     padding: 12px 22px;
     background: rgba(11,14,20,0.85);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
   }
@@ -1486,6 +1487,23 @@ function renderBadges() {
 }
 
 function networkErrorNotice(err) {
+  const isSafari = /apple/i.test(navigator.vendor || "");
+  const isFile = location.protocol === "file:";
+  if (isSafari && isFile) {
+    // Not a maybe: Safari always blocks fetch from a file-opened page.
+    return `
+      <div class="notice error">
+        <h3>Safari blocks this file from loading live prices</h3>
+        <p>Safari doesn't let a page opened straight off the disk download data —
+           Chrome and Firefox allow it, Safari doesn't. The app itself is fine;
+           it just needs to be opened the way Safari expects:</p>
+        <p><strong>1. Best fix:</strong> double-click <code>Coin&nbsp;Finder.command</code>
+           (it's in the same download). It opens this exact app in Safari properly —
+           just keep its small window open while you use the app.</p>
+        <p><strong>2. Or:</strong> open this file with Chrome or Firefox instead of Safari.</p>
+        <p>On an iPhone or iPad this file can't run at all — it needs a Mac or PC.</p>
+      </div>`;
+  }
   return `
     <div class="notice error">
       <h3>Couldn't reach the price data</h3>
@@ -1494,9 +1512,9 @@ function networkErrorNotice(err) {
          requests from a file opened directly off your disk.</p>
       <p><strong>Two things to try, in order:</strong></p>
       <p>1. Check you're online, then try again.</p>
-      <p>2. If it keeps failing, use the Python version instead — double-click
-         <code>Coin Finder.command</code> (Mac) or <code>Coin Finder.bat</code> (Windows)
-         in the same folder. It fetches the same data without the browser restriction.</p>
+      <p>2. If it keeps failing, double-click <code>Coin Finder.command</code> (Mac)
+         or <code>Coin Finder.bat</code> (Windows) from the same download — it opens
+         this same app in your browser in a way that's allowed to fetch data.</p>
       <p style="opacity:0.7">Technical detail: ${escapeHtml(err.message || String(err))}</p>
     </div>`;
 }

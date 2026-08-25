@@ -29,15 +29,21 @@ JavaScript port of `scoring.py` and `sell.py`, and `tests/test_js_parity.py`
 scores a spread of payloads through both engines and fails if any score,
 component, flag, or rejection reason differs.
 
-One caveat: some browsers refuse cross-site requests from a file opened off
-your disk. If the page says it can't reach the price data, use the Python
-version below — it has no such restriction.
+**Safari users:** Safari blocks a file-opened page from fetching live data
+(Chrome and Firefox allow it). Double-click **`Coin Finder.command`** instead —
+it serves the same app over `http://127.0.0.1` with a tiny local server from
+Python's standard library and opens it in your browser, which every browser
+allows. Keep its small window open while using the app. `Coin Finder.bat` does
+the same on Windows, falling back to opening the file directly when Python
+isn't installed.
 
 ---
 
-## Running the Python version
+## Running the terminal version
 
-Double-click **`Coin Finder.command`** (macOS/Linux) or **`Coin Finder.bat`** (Windows).
+The CLI still exists for terminal use (`python3 -m coinfinder.cli ...` after
+`pip install -r requirements.txt`), and the interactive menu remains at
+`python3 -m coinfinder.menu`.
 
 It checks for Python, installs the two dependencies on first run, and opens a
 menu — scan, check positions, track a buy — with no commands to type. Requires
