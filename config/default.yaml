@@ -1,0 +1,58 @@
+# coinfinder default configuration.
+# Copy this file, edit, and point to it with `coinfinder --config path/to/file.yaml ...`
+# to override without touching this one.
+
+discovery:
+  # Chains to scan on DexScreener. Meme coins mostly live on fast/cheap chains.
+  chains: ["solana", "base", "ethereum", "bsc"]
+  # Extra free-text queries to search for on DexScreener (widens discovery beyond
+  # the "boosted/trending" feed). Keep short and generic.
+  search_terms: ["pump", "meme"]
+  # Max candidates to keep after discovery, before scoring/filtering.
+  max_candidates: 150
+
+filters:
+  # Hard excludes. A candidate failing any of these is dropped before scoring,
+  # regardless of how good its score would be.
+  min_liquidity_usd: 15000
+  min_volume_h24_usd: 20000
+  min_age_minutes: 30        # avoid instant-rug sniping windows
+  max_age_days: 45           # after this it's not really an early "meme find" anymore
+  max_fdv_to_liquidity_ratio: 60   # very high FDV vs thin liquidity = dump risk
+  min_buy_ratio_h1: 0.45     # buys / (buys+sells) in the last hour, 0.5 = neutral
+
+scoring:
+  # Weights must be non-negative; they're normalized internally so they don't
+  # need to sum to 100.
+  weights:
+    liquidity: 15
+    turnover: 20
+    momentum: 25
+    buy_pressure: 20
+    age_fit: 10
+    safety: 10
+  # Liquidity (USD) considered "fully scored" for the liquidity component.
+  liquidity_saturation_usd: 300000
+  # volume_h24 / liquidity ratio considered "fully scored" for turnover.
+  turnover_saturation_ratio: 4.0
+  # Absolute h1 price-change % beyond which momentum is treated as "already
+  # pumped" and the score is penalized instead of rewarded.
+  momentum_late_pump_threshold_pct: 150
+  # Age band (hours) that scores best for age_fit.
+  age_fit_sweet_spot_hours: [2, 240]
+
+sell_rules:
+  take_profit_pct: 60          # suggest SELL (take profit) once unrealized gain hits this
+  stop_loss_pct: -25           # suggest SELL (stop loss) once unrealized loss hits this
+  trailing_stop_pct: -30       # suggest SELL if price falls this far from its post-entry peak
+  liquidity_drop_pct: -40      # URGENT SELL if pool liquidity drops this much since entry (possible rug/exit scam)
+  momentum_decay_volume_ratio: 0.15  # warn if current h1 volume < this fraction of the h24 hourly average
+  momentum_decay_min_hold_hours: 2   # don't fire momentum-decay warnings before a position has had time to develop
+
+http:
+  timeout_seconds: 12
+  user_agent: "coinfinder/0.1 (personal research tool)"
+
+storage:
+  positions_file: "data/positions.json"
+  scan_history_dir: "data/scan_history"

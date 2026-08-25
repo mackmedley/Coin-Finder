@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coinfinder"
+version = "0.1.0"
+description = "Meme coin discovery and exit-signal tool for manual trading on FOMO"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+coinfinder = "coinfinder.cli:main"
+
+[tool.setuptools]
+packages = ["coinfinder", "coinfinder.datasources"]
