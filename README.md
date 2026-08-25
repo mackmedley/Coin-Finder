@@ -11,6 +11,22 @@ It **places no orders and holds no funds**. There is no wallet, no private key, 
 
 ---
 
+## Easiest way to run it
+
+Double-click **`Coin Finder.command`** (macOS/Linux) or **`Coin Finder.bat`** (Windows).
+
+It checks for Python, installs the two dependencies on first run, and opens a
+menu — scan, check positions, track a buy — with no commands to type. Requires
+Python 3.10+ from [python.org](https://python.org/downloads); on Windows, tick
+**"Add Python to PATH"** during install.
+
+On macOS, the first double-click may be blocked as an unidentified developer:
+right-click the file → **Open** → **Open**. That's needed once.
+
+Everything below is the terminal equivalent, for when you want the extra flags.
+
+---
+
 ## Install
 
 ```bash
@@ -155,7 +171,7 @@ The provider is isolated behind `coinfinder/datasources/`, so adding Birdeye, Ge
 python3 -m pytest tests -q
 ```
 
-37 tests covering filters, every scoring component, all sell rules, position persistence, config validation, and provider response-shape handling. They run against synthetic fixtures and make no network calls.
+42 tests covering filters, every scoring component, all sell rules, position persistence, config validation, provider response-shape handling, and menu input parsing. They run against synthetic fixtures and make no network calls.
 
 ---
 
