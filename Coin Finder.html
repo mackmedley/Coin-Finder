@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:,">
 <title>Coin Finder</title>
 <style>
   /* Committed dark design: this is a local tool file, painted explicitly. */
@@ -336,6 +338,19 @@
 
   /* ---------- dialogs ---------- */
 
+  /* Browsers without <dialog> support treat it as a plain div and would show
+     all three popups permanently. This hides them regardless of support, and
+     the .fallback path positions them when opened without showModal(). */
+  dialog:not([open]) { display: none; }
+  dialog.fallback[open] {
+    display: block;
+    position: fixed;
+    top: 8vh;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+  }
+
   dialog {
     background: var(--panel);
     color: var(--text);
@@ -361,8 +376,22 @@
 </head>
 <body>
 
+<!-- Visible until the app's JavaScript finishes starting. If the file is opened
+     in a preview (phone tap, QuickLook, mail attachment viewer) scripts never
+     run and this stays on screen with instructions instead of silent dead buttons. -->
+<div id="boot-check" style="margin:14px 22px; padding:14px 16px; background:#2a1215; border:1px solid #6b2b2b; border-radius:10px; color:#ffd9d9; font:14px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;">
+  <b>The app hasn't started — buttons won't work yet.</b>
+  <div style="margin-top:6px; color:#e8b9b9;">
+    This almost always means the file opened in a <b>preview</b>, not a real browser. In order:<br>
+    1. <b>On a computer:</b> right-click the file → Open With → Chrome, Edge, Safari, or Firefox.<br>
+    2. <b>On a phone or tablet:</b> tapping a file only previews it — previews can't run apps. Open this file on a computer instead.<br>
+    3. If you're already in a real browser and still see this box, the error below says why — send it to me and I'll fix it.
+  </div>
+  <div id="boot-error" style="margin-top:8px; color:#ff8f8f; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>
+</div>
+
 <header>
-  <div class="brand"><h1>Coin&nbsp;Finder</h1><span>meme screener</span></div>
+  <div class="brand"><h1>Coin&nbsp;Finder</h1><span>meme screener · v3</span></div>
   <div class="tabs" id="tabs">
     <button data-view="find" class="active">Find</button>
     <button data-view="watch">Watchlist<span class="badge" id="watch-count"></span></button>
@@ -567,9 +596,25 @@ let CONFIG = deepMerge(DEFAULTS, readStore(STORE_CONFIG, {}));
 const API = "https://api.dexscreener.com";
 
 async function getJson(url) {
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
-  return res.json();
+  // One retry for transient failures, and a 12s timeout so a hung request
+  // can't leave a button stuck on "Scanning…" forever.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+      let res;
+      try {
+        res = await fetch(url, { headers: { Accept: "application/json" }, signal: ctrl ? ctrl.signal : undefined });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
+      return await res.json();
+    } catch (err) {
+      if (attempt === 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+  }
 }
 
 /** Endpoints return either a bare array or {pairs:[...]} — accept both. */
@@ -1020,6 +1065,11 @@ function toast(message, kind) {
   setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, 3500);
 }
 
+function openUrl(url) {
+  if (!/^https:\/\//.test(url)) return;
+  try { window.open(url, "_blank", "noopener"); } catch (err) { location.href = url; }
+}
+
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -1076,7 +1126,9 @@ function meterRow(label, value) {
  * App state
  * ------------------------------------------------------------------ */
 
-let PREFS = Object.assign({ autoScan: false, autoCheck: false, tab: "find" }, readStore(STORE_PREFS, {}));
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2 }, readStore(STORE_PREFS, {}));
+// v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
+if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
 function savePrefs() { writeStore(STORE_PREFS, PREFS); }
 
 const state = {
@@ -1201,7 +1253,7 @@ function detailRowHtml(c, colspan) {
     <div class="detail-actions">
       <button class="small primary" data-buy="${escapeHtml(candidateKey(c))}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
       <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy token address</button>
-      <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener"><button class="small ghost">Open DexScreener ↗</button></a>
+      <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Open DexScreener ↗</button>
     </div>
   </div></td></tr>`;
 }
@@ -1282,7 +1334,13 @@ function renderRejected() {
 }
 
 function renderScanAge() {
-  $("#scan-age").textContent = state.scannedAt ? "Scanned " + relTime(state.scannedAt) : "";
+  let text = state.scannedAt ? "Scanned " + relTime(state.scannedAt) : "";
+  if (state.scanning) text = "Scanning…";
+  else if (PREFS.autoScan && nextScanAt) {
+    const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+    text += (text ? " · " : "") + "next scan " + (s >= 90 ? Math.round(s / 60) + "m" : s + "s");
+  }
+  $("#scan-age").textContent = text;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1331,7 +1389,7 @@ function posDetailHtml(s, colspan) {
     </div>
     <div class="detail-actions">
       <button class="small" data-copy="${escapeHtml(p.pair_address)}">Copy pair address</button>
-      <a href="https://dexscreener.com/${escapeHtml(p.chain)}/${escapeHtml(p.pair_address)}" target="_blank" rel="noopener"><button class="small ghost">Open DexScreener ↗</button></a>
+      <button class="small ghost" data-open-url="https://dexscreener.com/${escapeHtml(p.chain)}/${escapeHtml(p.pair_address)}">Open DexScreener ↗</button>
       <button class="small ghost" data-remove="${escapeHtml(p.key)}" style="color:#f85149">Stop tracking</button>
     </div>
   </div></td></tr>`;
@@ -1404,7 +1462,7 @@ function renderWatchlist(priced) {
       <td class="num" style="color:var(--faint)">${relTime(w.added_at)}</td>
       <td style="white-space:nowrap">
         <button class="small" data-watch-buy="${escapeHtml(key)}">I bought this</button>
-        <a href="https://dexscreener.com/${escapeHtml(w.chain)}/${escapeHtml(w.pair_address)}" target="_blank" rel="noopener"><button class="small ghost">Open ↗</button></a>
+        <button class="small ghost" data-open-url="https://dexscreener.com/${escapeHtml(w.chain)}/${escapeHtml(w.pair_address)}">Open ↗</button>
         <button class="icon on" data-star="${escapeHtml(key)}" title="Remove from watchlist">★</button>
       </td>
     </tr>`;
@@ -1475,7 +1533,11 @@ async function doScan() {
   btn.disabled = true;
   btn.textContent = "Scanning…";
   $("#find-status").innerHTML = "";
-  $("#find-results").innerHTML = `<div class="table-wrap">${'<div class="skel-row"></div>'.repeat(7)}</div>`;
+  // Skeleton only when there's nothing to show — a rescan keeps the current
+  // table on screen instead of blanking it for a few seconds.
+  if (!state.scannedAt) {
+    $("#find-results").innerHTML = `<div class="table-wrap">${'<div class="skel-row"></div>'.repeat(7)}</div>`;
+  }
 
   try {
     const candidates = await discover();
@@ -1502,6 +1564,8 @@ async function doScan() {
     state.scanning = false;
     btn.disabled = false;
     btn.textContent = "Scan";
+    if (PREFS.autoScan) scheduleAutoScan();  // manual scans reset the countdown too
+    renderScanAge();
   }
 }
 
@@ -1664,6 +1728,11 @@ $("#view-find").addEventListener("click", async (e) => {
     openBuyDialog(buy.dataset.buy);
     return;
   }
+  const open = e.target.closest("[data-open-url]");
+  if (open) {
+    openUrl(open.dataset.openUrl);
+    return;
+  }
   const copy = e.target.closest("[data-copy]");
   if (copy) {
     toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
@@ -1721,6 +1790,11 @@ $("#view-positions").addEventListener("click", async (e) => {
     }
     return;
   }
+  const open = e.target.closest("[data-open-url]");
+  if (open) {
+    openUrl(open.dataset.openUrl);
+    return;
+  }
   const copy = e.target.closest("[data-copy]");
   if (copy) {
     toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
@@ -1738,6 +1812,8 @@ $("#view-positions").addEventListener("click", async (e) => {
 $("#view-watch").addEventListener("click", (e) => {
   const star = e.target.closest("[data-star]");
   if (star) { toggleWatch(star.dataset.star); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
   const buy = e.target.closest("[data-watch-buy]");
   if (buy) {
     const w = loadWatchlist()[buy.dataset.watchBuy];
@@ -1757,7 +1833,7 @@ function openBuyDialog(key) {
   $("#buy-amount").value = "";
   $("#buy-price").value = "";
   $("#buy-note").value = "";
-  $("#dlg-buy").showModal();
+  openDialog($("#dlg-buy"));
   $("#buy-amount").focus();
 }
 
@@ -1765,7 +1841,7 @@ $("#buy-save").addEventListener("click", () => {
   const amount = Number($("#buy-amount").value);
   if (!(amount > 0)) { toast("Enter how much you put in, in dollars", "bad"); return; }
   addPosition(pendingBuy, amount, Number($("#buy-price").value) || 0, $("#buy-note").value);
-  $("#dlg-buy").close();
+  closeDialog($("#dlg-buy"));
   renderBadges();
   if (state.expandedKey) renderResults();
   toast(`Tracking ${pendingBuy.symbol} — see the Positions tab`, "good");
@@ -1777,7 +1853,7 @@ function openManualBuy(chain, pair) {
   $("#man-link").value = chain && pair ? `https://dexscreener.com/${chain}/${pair}` : "";
   $("#man-amount").value = "";
   $("#man-price").value = "";
-  $("#dlg-manual").showModal();
+  openDialog($("#dlg-manual"));
   (chain ? $("#man-amount") : $("#man-link")).focus();
 }
 
@@ -1796,7 +1872,7 @@ $("#man-save").addEventListener("click", async () => {
   btn.textContent = "Add";
   if (!candidate) { toast("Couldn't find that pair — check the link and your connection", "bad"); return; }
   addPosition(candidate, amount, Number($("#man-price").value) || 0, "");
-  $("#dlg-manual").close();
+  closeDialog($("#dlg-manual"));
   renderBadges();
   switchTab("positions");
   doCheck(true);
@@ -1863,7 +1939,7 @@ function fillSettings() {
   $("#set-liqdrop").value = CONFIG.sell_rules.liquidity_drop_pct;
 }
 
-$("#btn-settings").addEventListener("click", () => { fillSettings(); $("#dlg-settings").showModal(); });
+$("#btn-settings").addEventListener("click", () => { fillSettings(); openDialog($("#dlg-settings")); });
 
 $("#set-save").addEventListener("click", () => {
   const chains = $("#set-chains").value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -1882,7 +1958,7 @@ $("#set-save").addEventListener("click", () => {
   CONFIG.sell_rules.trailing_stop_pct = numOr($("#set-trail").value, DEFAULTS.sell_rules.trailing_stop_pct);
   CONFIG.sell_rules.liquidity_drop_pct = numOr($("#set-liqdrop").value, DEFAULTS.sell_rules.liquidity_drop_pct);
   writeStore(STORE_CONFIG, CONFIG);
-  $("#dlg-settings").close();
+  closeDialog($("#dlg-settings"));
   toast("Saved — scan settings apply on the next scan", "good");
 });
 
@@ -1893,16 +1969,34 @@ $("#set-reset").addEventListener("click", () => {
   toast("Settings reset to defaults");
 });
 
-/* ---------- dialogs: shared close behavior ---------- */
+/* ---------- dialogs: open/close that works without showModal support ---------- */
+
+function openDialog(dlg) {
+  if (typeof dlg.showModal === "function") {
+    dlg.showModal();
+  } else {
+    dlg.classList.add("fallback");
+    dlg.setAttribute("open", "");
+  }
+}
+
+function closeDialog(dlg) {
+  if (dlg.classList.contains("fallback") || typeof dlg.close !== "function") {
+    dlg.removeAttribute("open");
+  } else if (dlg.open) {
+    dlg.close();
+  }
+}
 
 $$("dialog").forEach((dlg) => {
-  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
-  dlg.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", () => dlg.close()));
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) closeDialog(dlg); });
+  dlg.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", () => closeDialog(dlg)));
 });
 
 /* ---------- keyboard ---------- */
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { $$("dialog[open]").forEach(closeDialog); return; }
   if (e.target.matches("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "/") { e.preventDefault(); switchTab("find"); $("#search").focus(); }
   else if (e.key === "1") switchTab("find");
@@ -1914,27 +2008,66 @@ document.addEventListener("keydown", (e) => {
 
 let autoScanTimer = null;
 let autoCheckTimer = null;
+let nextScanAt = 0;
 
-function applyAutoTimers() {
-  clearInterval(autoScanTimer);
-  clearInterval(autoCheckTimer);
-  if (PREFS.autoScan) autoScanTimer = setInterval(() => { if (!document.hidden) doScan(); }, 120000);
-  if (PREFS.autoCheck) autoCheckTimer = setInterval(() => { if (!document.hidden) doCheck(true); }, 60000);
+/* setTimeout chains rather than intervals: each run re-arms after it finishes,
+   so a slow network can't stack overlapping scans, and the countdown is real. */
+function scheduleAutoScan() {
+  clearTimeout(autoScanTimer);
+  if (!PREFS.autoScan) { nextScanAt = 0; return; }
+  nextScanAt = Date.now() + 120000;
+  autoScanTimer = setTimeout(async () => {
+    if (!document.hidden) await doScan();
+    scheduleAutoScan();
+  }, 120000);
 }
 
-$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); applyAutoTimers(); });
-$("#auto-check").addEventListener("change", (e) => { PREFS.autoCheck = e.target.checked; savePrefs(); applyAutoTimers(); });
+function scheduleAutoCheck() {
+  clearTimeout(autoCheckTimer);
+  if (!PREFS.autoCheck) return;
+  autoCheckTimer = setTimeout(async () => {
+    if (!document.hidden) await doCheck(true);
+    scheduleAutoCheck();
+  }, 60000);
+}
+
+$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); scheduleAutoScan(); renderScanAge(); });
+$("#auto-check").addEventListener("change", (e) => { PREFS.autoCheck = e.target.checked; savePrefs(); scheduleAutoCheck(); });
 
 /* ---------- init ---------- */
 
-hydrateScan();
-renderBadges();
-renderResults();
-$("#auto-scan").checked = !!PREFS.autoScan;
-$("#auto-check").checked = !!PREFS.autoCheck;
-applyAutoTimers();
-setInterval(renderScanAge, 30000);
-if (PREFS.tab && PREFS.tab !== "find") switchTab(PREFS.tab);
+/* Anything that breaks from here on must be SEEN, not swallowed: while the
+   boot banner is still up it gets the error text; afterwards errors toast. */
+function reportError(message) {
+  const slot = document.getElementById("boot-error");
+  if (slot) { slot.textContent = message; return; }
+  try { toast("Something went wrong: " + message, "bad"); } catch (err) { /* nothing left to report to */ }
+}
+window.addEventListener("error", (e) => reportError(e.message || String(e.error || "unknown error")));
+window.addEventListener("unhandledrejection", (e) => reportError(String((e.reason && e.reason.message) || e.reason || "unknown error")));
+
+try {
+  hydrateScan();
+  renderBadges();
+  renderResults();
+  $("#auto-scan").checked = !!PREFS.autoScan;
+  $("#auto-check").checked = !!PREFS.autoCheck;
+  scheduleAutoScan();
+  scheduleAutoCheck();
+  setInterval(renderScanAge, 1000);
+  if (PREFS.tab && PREFS.tab !== "find") switchTab(PREFS.tab);
+
+  // The app is alive — take down the "didn't start" banner.
+  const bootCheck = document.getElementById("boot-check");
+  if (bootCheck) bootCheck.remove();
+
+  // Auto-search on open: scan immediately, and price any tracked positions.
+  doScan();
+  if (Object.keys(loadPositions()).length) doCheck(true);
+} catch (err) {
+  reportError((err && err.stack) || String(err));
+  throw err;
+}
 </script>
 </body>
 </html>
