@@ -311,6 +311,26 @@
   }
   .pick .plan b { color: var(--text); }
   .pick .p-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .play { margin-bottom: 18px; }
+
+  /* stop -> target progress rail */
+  .rail { margin: 2px 0 0; }
+  .rail-track {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(208,59,59,0.55), rgba(139,152,169,0.3) 45%, rgba(63,185,80,0.55));
+  }
+  .rail-mark {
+    position: absolute;
+    top: -3px;
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--text);
+    box-shadow: 0 0 0 2px var(--panel);
+  }
+  .rail-legend { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-top: 3px; }
 
   /* ---------- feed tab ---------- */
 
@@ -521,6 +541,13 @@
     <div class="tiles" id="feed-tiles" hidden></div>
     <div class="toolbar">
       <input id="feed-search" class="search" type="search" placeholder="Search the feed…">
+      <select id="feed-sort" title="Sort the feed">
+        <option value="smart">Best first</option>
+        <option value="new">Newest first</option>
+        <option value="active">Most active</option>
+        <option value="movers">Biggest movers</option>
+      </select>
+      <label class="switch"><input type="checkbox" id="feed-auto">Auto 2&nbsp;min</label>
       <div class="chips" id="feed-chips"></div>
     </div>
     <div id="feed-status"></div>
@@ -550,11 +577,13 @@
       <button id="btn-export" class="ghost small">Export</button>
       <input type="file" id="import-file" accept="application/json" hidden>
       <div class="spacer"></div>
-      <label class="switch"><input type="checkbox" id="auto-check">Auto-check 60&nbsp;s</label>
+      <label class="switch"><input type="checkbox" id="auto-check">Auto-check 30&nbsp;s</label>
+      <label class="switch"><input type="checkbox" id="notify-toggle">Alert me</label>
     </div>
     <div class="tiles" id="pos-tiles" hidden></div>
     <div id="pos-status"></div>
     <div id="pos-results"></div>
+    <div id="pos-history" style="margin-top:16px"></div>
   </section>
 </main>
 
@@ -1167,6 +1196,34 @@ function savePositions(positions) {
   return writeStore(STORE_POSITIONS, positions);
 }
 
+const STORE_HISTORY = "coinfinder.history";
+
+function loadHistory() {
+  const raw = readStore(STORE_HISTORY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** Close a position into the trade journal, so wins and losses are recorded. */
+function closePosition(key, exitPrice) {
+  const positions = loadPositions();
+  const p = positions[key];
+  if (!p) return null;
+  const price = exitPrice > 0 ? exitPrice : 0;
+  const pnlPct = price > 0 ? pctChange(price, p.entry_price_usd) : 0;
+  const record = {
+    key, symbol: p.symbol, chain: p.chain, pair_address: p.pair_address,
+    entry_price_usd: p.entry_price_usd, exit_price_usd: price,
+    amount_usd: p.amount_usd, pnl_pct: pnlPct, pnl_usd: (p.amount_usd * pnlPct) / 100,
+    opened_at: p.opened_at, closed_at: Date.now() / 1000, note: p.note || "",
+  };
+  const history = loadHistory();
+  history.unshift(record);
+  writeStore(STORE_HISTORY, history.slice(0, 200));
+  delete positions[key];
+  savePositions(positions);
+  return record;
+}
+
 function addPosition(candidate, amountUsd, entryPrice, note) {
   const positions = loadPositions();
   const key = candidate.chain + ":" + candidate.pair_address;
@@ -1365,89 +1422,149 @@ document.addEventListener("click", (e) => {
 }, true);
 
 /* ------------------------------------------------------------------ *
- * Buy-now picks
+ * Plays — the same scored coins, grouped by what you'd actually DO
+ *
+ * A score answers "how good", not "good for what". A coin heating up
+ * right now and a coin worth sitting on are different trades with
+ * different hold times, so each play has its own gate and its own
+ * ranking, and every card says which number qualified it.
  * ------------------------------------------------------------------ */
 
-/* Stricter than "passed the filters": these gates are what separates
-   "tradeable" from "worth opening FOMO for right now". */
-function pickCandidates() {
-  return state.passing.filter((c) => {
-    const b = c.score_breakdown || {};
-    return c.score >= 60
-      && (b.safety || 0) >= 0.55
-      && (b.momentum || 0) >= 0.25
-      && (b.buy_pressure || 0) >= 0.2
-      && c.liquidity_usd >= 30000
-      && !(c.flags || []).some((f) => f.indexOf("already pumped") === 0);
-  }).slice(0, 3);
+/** 24h-average-relative volume in the last hour. >1 = heating up. */
+function velocity(c) {
+  const hourlyAverage = c.volume_h24 / 24;
+  return hourlyAverage > 0 ? c.volume_h1 / hourlyAverage : 0;
 }
 
-function pickWhy(c) {
-  const b = c.score_breakdown || {};
-  const lines = [];
-  if ((b.momentum || 0) >= 0.4)
-    lines.push(`Moving: ${c.price_change_h1 >= 0 ? "+" : ""}${c.price_change_h1.toFixed(0)}% last hour, ${c.price_change_h6 >= 0 ? "+" : ""}${c.price_change_h6.toFixed(0)}% over 6h`);
-  if ((b.buy_pressure || 0) >= 0.4)
-    lines.push(`Buyers in control: ${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys (${c.buys_h1} vs ${c.sells_h1})`);
-  if ((b.turnover || 0) >= 0.5)
-    lines.push(`Heavy trading: 24h volume is ${c.turnover_ratio.toFixed(1)}× the pool`);
-  if ((b.liquidity || 0) >= 0.5)
-    lines.push(`Exitable: ${fmtCompact(c.liquidity_usd)} pool depth`);
-  if ((b.safety || 0) >= 0.8 && !(c.flags || []).length)
-    lines.push("No red flags raised");
-  return lines.slice(0, 3);
+function notAlreadyPumped(c) {
+  return c.price_change_h1 <= CONFIG.scoring.momentum_late_pump_threshold_pct;
+}
+
+const PLAYS = [
+  {
+    id: "hour",
+    title: "Moving in the next hour",
+    blurb: "Volume accelerating right now with buyers in control — the fastest and the most fragile. Minutes to hours, watch it closely.",
+    hold: "minutes–hours",
+    test: (c) => velocity(c) >= 1.5 && c.price_change_h1 > 3 && c.buy_ratio_h1 >= 0.55
+      && (c.buys_h1 + c.sells_h1) >= 30 && c.liquidity_usd >= 25000
+      && (c.score_breakdown.safety || 0) >= 0.5 && notAlreadyPumped(c),
+    rank: (c) => velocity(c) * (1 + c.price_change_h1 / 100),
+    why: (c) => [
+      `Trading ${velocity(c).toFixed(1)}× its normal hourly volume right now`,
+      `${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys (${c.buys_h1} vs ${c.sells_h1})`,
+      `Up ${c.price_change_h1.toFixed(0)}% in the last hour`,
+    ],
+  },
+  {
+    id: "climb",
+    title: "Steady climbers",
+    blurb: "Up over 6h and 24h without a vertical spike — a trend rather than a candle. Hours to a few days.",
+    hold: "hours–days",
+    test: (c) => c.price_change_h6 > 0 && c.price_change_h24 > 0
+      && c.price_change_h1 > -5 && c.price_change_h1 < 60
+      && c.turnover_ratio >= 0.5 && c.liquidity_usd >= 40000
+      && (c.score_breakdown.safety || 0) >= 0.6 && c.age_hours >= 24,
+    rank: (c) => c.score,
+    why: (c) => [
+      `Up ${c.price_change_h6.toFixed(0)}% over 6h and ${c.price_change_h24.toFixed(0)}% over 24h`,
+      `No spike: ${c.price_change_h1 >= 0 ? "+" : ""}${c.price_change_h1.toFixed(0)}% in the last hour`,
+      `${c.turnover_ratio.toFixed(1)}× the pool traded in 24h`,
+    ],
+  },
+  {
+    id: "hold",
+    title: "Long holds",
+    blurb: "Survived past the rug window with deep liquidity and a real presence. The ones you can size up and sit on.",
+    hold: "days–weeks",
+    test: (c) => c.age_hours >= 24 * 7 && c.liquidity_usd >= 100000
+      && (c.score_breakdown.safety || 0) >= 0.7 && c.turnover_ratio >= 0.3
+      && c.price_change_h24 > -20 && (c.socials.length + c.websites.length) > 0,
+    rank: (c) => c.liquidity_usd * (c.score_breakdown.safety || 0),
+    why: (c) => [
+      `${(c.age_hours / 24).toFixed(0)} days old — past the window where most rugs happen`,
+      `${fmtCompact(c.liquidity_usd)} liquidity, deep enough to exit a real position`,
+      `${c.socials.length + c.websites.length} public link${c.socials.length + c.websites.length === 1 ? "" : "s"}, still actively traded`,
+    ],
+  },
+  {
+    id: "fresh",
+    title: "Just launched",
+    blurb: "Hours old with early traction. The biggest upside and by far the most likely to go to zero — smallest size here.",
+    hold: "highest risk",
+    test: (c) => c.age_hours < 24 && c.age_hours > 0 && c.liquidity_usd >= 20000
+      && c.buy_ratio_h1 >= 0.55 && c.volume_h24 >= 20000 && (c.buys_h1 + c.sells_h1) >= 20,
+    rank: (c) => velocity(c),
+    why: (c) => [
+      `${fmtAge(c.age_hours)} old with ${fmtCompact(c.volume_h24)} already traded`,
+      `${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys`,
+      `${fmtCompact(c.liquidity_usd)} liquidity so far`,
+    ],
+  },
+];
+
+function playCard(c, play) {
+  const key = candidateKey(c);
+  const tracked = !!loadPositions()[key];
+  const sl = CONFIG.sell_rules.stop_loss_pct;
+  const tp = CONFIG.sell_rules.take_profit_pct;
+  const stop = c.price_usd * (1 + sl / 100);
+  const target = c.price_usd * (1 + tp / 100);
+  const why = play.why(c).map((w) => `<li>${escapeHtml(w)}</li>`).join("");
+  const cautions = (c.flags || []).map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("");
+  return `<div class="pick">
+    <div class="p-top">
+      <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+      <span class="sym">${escapeHtml(c.symbol)}</span>
+      <span class="chain-tag">${escapeHtml(c.chain)}</span>
+      <span class="spacer"></span>
+      <span class="chain-tag" title="Age of the trading pair">${c.age_hours < 24 ? "🕐 " : ""}${fmtAge(c.age_hours)} old</span>
+      <span style="font-variant-numeric:tabular-nums">${fmtPrice(c.price_usd)}</span>
+    </div>
+    <ul class="why">${why}</ul>
+    ${cautions ? `<div>${cautions}</div>` : ""}
+    <div class="plan">Buying at ${fmtPrice(c.price_usd)}: stop <b>${fmtPrice(stop)}</b> (${sl}%),
+      target <b>${fmtPrice(target)}</b> (+${tp}%). Typical hold: <b>${escapeHtml(play.hold)}</b>.</div>
+    <div class="p-actions">
+      <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy for FOMO</button>
+      <button class="small primary" data-buy="${escapeHtml(key)}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
+      <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
+    </div>
+  </div>`;
 }
 
 function renderPicks() {
   const target = $("#find-picks");
   if (!state.scannedAt) { target.innerHTML = ""; return; }
-  const picks = pickCandidates();
-  const sl = CONFIG.sell_rules.stop_loss_pct;
-  const tp = CONFIG.sell_rules.take_profit_pct;
 
-  if (!picks.length) {
-    target.innerHTML = `<div class="picks-head"><h2>Buy-now picks</h2>
-      <span>nothing clears the bar this scan — that's normal, most scans deserve zero buys</span></div>`;
-    return;
-  }
-
-  const cards = picks.map((c) => {
-    const key = candidateKey(c);
-    const tracked = !!loadPositions()[key];
-    const stop = c.price_usd * (1 + sl / 100);
-    const target_ = c.price_usd * (1 + tp / 100);
-    const why = pickWhy(c).map((w) => `<li>${escapeHtml(w)}</li>`).join("");
-    const cautions = (c.flags || []).map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("");
-    return `<div class="pick">
-      <div class="p-top">
-        <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
-        <span class="sym">${escapeHtml(c.symbol)}</span>
-        <span class="chain-tag">${escapeHtml(c.chain)}</span>
-        <span class="spacer"></span>
-        <span class="num" style="font-variant-numeric:tabular-nums">${fmtPrice(c.price_usd)}</span>
-      </div>
-      <ul class="why">${why}</ul>
-      ${cautions ? `<div>${cautions}</div>` : ""}
-      <div class="plan">If you buy at ${fmtPrice(c.price_usd)}: stop out at <b>${fmtPrice(stop)}</b> (${sl}%),
-        take profit at <b>${fmtPrice(target_)}</b> (+${tp}%). The Positions tab watches both for you.</div>
-      <div class="p-actions">
-        <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy address for FOMO</button>
-        <button class="small primary" data-buy="${escapeHtml(key)}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
-        <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
-      </div>
+  const used = new Set();
+  const sections = PLAYS.map((play) => {
+    const matches = state.passing
+      .filter((c) => {
+        try { return play.test(c); } catch (err) { return false; }
+      })
+      // A coin belongs to the first play it qualifies for, so the same name
+      // doesn't fill every section.
+      .filter((c) => !used.has(candidateKey(c)))
+      .sort((a, b) => play.rank(b) - play.rank(a))
+      .slice(0, 3);
+    matches.forEach((c) => used.add(candidateKey(c)));
+    if (!matches.length) return "";
+    return `<div class="play">
+      <div class="picks-head"><h2>${escapeHtml(play.title)}</h2><span>${escapeHtml(play.blurb)}</span></div>
+      <div class="picks">${matches.map((c) => playCard(c, play)).join("")}</div>
     </div>`;
-  }).join("");
+  }).filter(Boolean).join("");
 
-  target.innerHTML = `<div class="picks-head"><h2>Buy-now picks</h2>
-    <span>the scan's strongest entries — suggestions, not financial advice</span></div>
-    <div class="picks">${cards}</div>`;
+  target.innerHTML = sections || `<div class="picks-head"><h2>No plays this scan</h2>
+    <span>nothing clears the bar right now — most scans deserve zero buys, and that's the point</span></div>`;
 }
 
 /* ------------------------------------------------------------------ *
  * App state
  * ------------------------------------------------------------------ */
 
-let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1 }, readStore(STORE_PREFS, {}));
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart" }, readStore(STORE_PREFS, {}));
 // v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
 if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
 function savePrefs() { writeStore(STORE_PREFS, PREFS); }
@@ -1465,6 +1582,8 @@ const state = {
   sortDir: -1,
   expandedKey: null,
   showRejected: false,
+  showHistory: false,
+  alerted: {},
   signals: null,
   posExpandedKey: null,
   scanning: false,
@@ -1691,6 +1810,20 @@ function renderPosTiles(signals) {
     <div class="tile"><div class="t-label">Exit signals</div><div class="t-value">${actionable}</div></div>`;
 }
 
+/** Where the price sits between your stop and your take-profit. */
+function progressRail(s) {
+  if (s.stale || !s.price_usd) return "";
+  const sl = CONFIG.sell_rules.stop_loss_pct;
+  const tp = CONFIG.sell_rules.take_profit_pct;
+  const span = tp - sl;
+  if (!(span > 0)) return "";
+  const pos = clamp((s.pnl_pct - sl) / span) * 100;
+  return `<div class="rail">
+    <div class="rail-track"><div class="rail-mark" style="left:calc(${pos.toFixed(1)}% - 1.5px)"></div></div>
+    <div class="rail-legend"><span>stop ${sl}%</span><span>${s.pnl_pct >= 0 ? "+" : ""}${s.pnl_pct.toFixed(1)}%</span><span>+${tp}%</span></div>
+  </div>`;
+}
+
 function posDetailHtml(s, colspan) {
   const p = s.position;
   const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
@@ -1716,12 +1849,44 @@ function posDetailHtml(s, colspan) {
     <div class="detail-actions">
       <button class="small" data-copy="${escapeHtml(p.pair_address)}">Copy pair address</button>
       <button class="small ghost" data-open-url="https://dexscreener.com/${escapeHtml(p.chain)}/${escapeHtml(p.pair_address)}">Open DexScreener ↗</button>
+      <button class="small" data-sold="${escapeHtml(p.key)}">Sold it — log the result</button>
       <button class="small ghost" data-remove="${escapeHtml(p.key)}" style="color:#f85149">Stop tracking</button>
     </div>
   </div></td></tr>`;
 }
 
+function renderHistory() {
+  const history = loadHistory();
+  const block = $("#pos-history");
+  if (!history.length) { block.innerHTML = ""; return; }
+
+  const wins = history.filter((h) => h.pnl_usd > 0).length;
+  const total = history.reduce((sum, h) => sum + h.pnl_usd, 0);
+  const rows = state.showHistory ? history.slice(0, 25).map((h) => `
+    <tr>
+      <td><div class="sym">${escapeHtml(h.symbol)}</div><span class="chain-tag">${escapeHtml(h.chain)}</span></td>
+      <td class="num">${fmtPrice(h.entry_price_usd)}</td>
+      <td class="num">${fmtPrice(h.exit_price_usd)}</td>
+      <td class="num">${fmtPct(h.pnl_pct)}</td>
+      <td class="num"><span class="${h.pnl_usd >= 0 ? "pos" : "neg"}">${h.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(h.pnl_usd).toFixed(2)}</span></td>
+      <td class="num">${fmtAge(Math.max(0, (h.closed_at - h.opened_at) / 3600))}</td>
+      <td class="num" style="color:var(--faint)">${relTime(h.closed_at * 1000)}</td>
+    </tr>`).join("") : "";
+
+  block.innerHTML = `
+    <button class="section-toggle" id="toggle-history">${state.showHistory ? "▾" : "▸"}
+      Closed trades (${history.length}) · ${wins}W–${history.length - wins}L ·
+      <span class="${total >= 0 ? "pos" : "neg"}">${total >= 0 ? "+" : "−"}$${Math.abs(total).toFixed(2)} realized</span>
+    </button>
+    ${state.showHistory ? `<div class="table-wrap"><table style="min-width:640px">
+      <thead><tr><th>Coin</th><th style="text-align:right">Entry</th><th style="text-align:right">Exit</th>
+      <th style="text-align:right">P&amp;L</th><th style="text-align:right">P&amp;L $</th>
+      <th style="text-align:right">Held</th><th style="text-align:right">Closed</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : ""}`;
+}
+
 function renderSignals() {
+  renderHistory();
   const target = $("#pos-results");
   const signals = state.signals;
 
@@ -1747,7 +1912,7 @@ function renderSignals() {
       <td><span class="verdict ${cls}">${s.verdict}</span></td>
       <td><div class="sym">${escapeHtml(p.symbol)}</div><span class="chain-tag">${escapeHtml(p.chain)}</span>
           <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul></td>
-      <td>${sparklineSvg(p.history)}</td>
+      <td style="min-width:150px">${sparklineSvg(p.history)}${progressRail(s)}</td>
       <td class="num">${fmtPrice(p.entry_price_usd)}</td>
       <td class="num">${fmtPrice(s.price_usd)}</td>
       <td class="num">${s.stale ? "—" : fmtPct(s.pnl_pct)}</td>
@@ -2022,12 +2187,17 @@ function visibleFeed() {
   let rows = FEED.items;
   if (FEED.filter !== "all") rows = rows.filter((i) => i.kind === FEED.filter);
   if (q) rows = rows.filter((i) => (i.title + " " + i.source + " " + (i.description || "")).toLowerCase().includes(q));
-  // Rank: pools by volume, everything else newest first, timeless items last.
-  return rows.slice().sort((a, b) => {
-    if (a.kind === b.kind && (a.kind === "trending_pool" || a.kind === "newpool"))
-      return (b.volume || 0) - (a.volume || 0);
-    return feedTime(b) - feedTime(a);
-  }).slice(0, 80);
+  const sort = PREFS.feedSort || "smart";
+  const sorters = {
+    // Pools by volume, everything else newest first — the default mix.
+    smart: (a, b) => (a.kind === b.kind && (a.kind === "trending_pool" || a.kind === "newpool"))
+      ? (b.volume || 0) - (a.volume || 0)
+      : feedTime(b) - feedTime(a),
+    new: (a, b) => feedTime(b) - feedTime(a),
+    active: (a, b) => (b.volume || b.score || 0) - (a.volume || a.score || 0),
+    movers: (a, b) => (b.change_h1 || -Infinity) - (a.change_h1 || -Infinity),
+  };
+  return rows.slice().sort(sorters[sort] || sorters.smart).slice(0, 80);
 }
 
 function feedItemHtml(item) {
@@ -2163,6 +2333,27 @@ async function scoreFromFeed(key) {
 
 $("#btn-feed-refresh").addEventListener("click", () => loadFeed(true));
 
+let feedTimer = null;
+function scheduleFeedAuto() {
+  clearInterval(feedTimer);
+  if (!PREFS.feedAuto) return;
+  feedTimer = setInterval(() => {
+    if (!document.hidden && $("#view-feed").classList.contains("active")) loadFeed(true);
+  }, 120000);
+}
+
+$("#feed-auto").addEventListener("change", (e) => {
+  PREFS.feedAuto = e.target.checked;
+  savePrefs();
+  scheduleFeedAuto();
+});
+
+$("#feed-sort").addEventListener("change", (e) => {
+  PREFS.feedSort = e.target.value;
+  savePrefs();
+  renderFeed();
+});
+
 $("#feed-search").addEventListener("input", (() => {
   let timer = null;
   return (e) => {
@@ -2212,6 +2403,35 @@ function renderLearn() {
     <h2>Red flags, in plain words</h2>
     <p>These appear as small tags on coins. <b>Tap any tag anywhere in the app</b> and it explains itself.</p>
     <dl>${g}</dl>
+  </section>
+  <section>
+    <h2>The four plays</h2>
+    <p>A score says <i>how good</i>, not <i>good for what</i>. Each scan sorts its best coins into
+       four trades with different hold times — a coin appears in one section only, the first it
+       qualifies for, and every card shows the pair's age so freshness is never hidden:</p>
+    <ul>
+      <li><b>Moving in the next hour</b> — trading well above its normal hourly volume with buyers
+          dominant. Fastest and most fragile; minutes to hours, and it needs watching.</li>
+      <li><b>Steady climbers</b> — up over 6h <i>and</i> 24h without a vertical candle. A trend
+          rather than a spike; hours to days.</li>
+      <li><b>Long holds</b> — a week or more old, deep liquidity, high safety, public links. The
+          ones you can size up and sit on; days to weeks.</li>
+      <li><b>Just launched</b> — under a day old with early traction. Biggest upside, and by far
+          the most likely to go to zero. Smallest size here, always.</li>
+    </ul>
+    <p>Empty sections are normal and are not a failure — most scans deserve zero buys.</p>
+  </section>
+  <section>
+    <h2>Tracking what you bought</h2>
+    <p>After you buy in FOMO, press <b>I bought this</b>. The Positions tab then shows a
+       <b>stop → target rail</b> for each coin: a marker sliding between your stop loss on the left
+       and your take-profit on the right, so you can see at a glance how close a trade is to either
+       exit without reading a single number.</p>
+    <p>Turn on <b>Alert me</b> and your browser tells you the moment an exit rule fires — once per
+       change in verdict, not every check, so it never nags. When you sell, press
+       <b>Sold it — log the result</b> and enter your fill: the trade moves into a journal with
+       realized P&amp;L, your win–loss record, and total realized profit. That record is the only
+       honest way to find out whether the scores are actually working for you.</p>
   </section>
   <section>
     <h2>Before you buy — 60-second checklist</h2>
@@ -2482,6 +2702,7 @@ async function doCheck(silent) {
     savePositions(positions);
     state.signals = signals;
     renderSignals();
+    notifyExits(signals);
 
     const actionable = signals.filter((s) => s.verdict !== "HOLD");
     if (failures === keys.length && keys.length > 0) {
@@ -2497,6 +2718,47 @@ async function doCheck(silent) {
     state.checking = false;
     btn.disabled = false;
     btn.textContent = "Check for sell signals";
+  }
+}
+
+/* Desktop alerts for exit signals — opt-in, and only when the verdict
+   CHANGES, so a position sitting on SELL doesn't nag every 30 seconds. */
+function notifyExits(signals) {
+  for (const s of signals) {
+    const key = s.position.key;
+    const previous = state.alerted[key];
+    if (s.verdict === "HOLD") { delete state.alerted[key]; continue; }
+    if (previous === s.verdict) continue;
+    state.alerted[key] = s.verdict;
+
+    const message = `${s.position.symbol}: ${s.verdict} — ${s.reasons[0] || ""}`;
+    toast(message, s.verdict === "TRIM" ? null : "bad");
+    try {
+      if (PREFS.notify && typeof Notification === "function" && Notification.permission === "granted") {
+        new Notification("Coin Finder — " + s.verdict, { body: message, tag: key });
+      }
+    } catch (err) { /* notifications unavailable; the toast already fired */ }
+  }
+}
+
+async function enableNotifications(on) {
+  PREFS.notify = on;
+  savePrefs();
+  if (!on) return;
+  try {
+    if (typeof Notification !== "function") { toast("This browser has no desktop alerts", "bad"); PREFS.notify = false; savePrefs(); return; }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      PREFS.notify = false;
+      savePrefs();
+      $("#notify-toggle").checked = false;
+      toast("Alerts blocked — allow notifications for this site to use them", "bad");
+    } else {
+      toast("Alerts on — you'll be told when an exit rule fires", "good");
+    }
+  } catch (err) {
+    PREFS.notify = false;
+    savePrefs();
   }
 }
 
@@ -2657,6 +2919,28 @@ $("#view-positions").addEventListener("click", async (e) => {
       renderSignals();
       toast("Stopped tracking");
     }
+    return;
+  }
+  if (e.target.closest("#toggle-history")) { state.showHistory = !state.showHistory; renderHistory(); return; }
+  const sold = e.target.closest("[data-sold]");
+  if (sold) {
+    const key = sold.dataset.sold;
+    const signal = (state.signals || []).find((s) => s.position.key === key);
+    const suggested = signal && signal.price_usd ? signal.price_usd : 0;
+    const answer = prompt(
+      "What price did you sell at?\n\nLeave the suggested value to use the last live price, or type your actual fill.",
+      suggested ? String(suggested) : "");
+    if (answer === null) return;
+    const price = Number(String(answer).replace(/[$,\s]/g, ""));
+    if (!(price > 0)) { toast("Need a sell price above zero to log the result", "bad"); return; }
+    const record = closePosition(key, price);
+    if (!record) return;
+    renderBadges();
+    state.posExpandedKey = null;
+    state.signals = (state.signals || []).filter((s) => s.position.key !== key);
+    renderSignals();
+    toast(`${record.symbol} logged: ${record.pnl_pct >= 0 ? "+" : ""}${record.pnl_pct.toFixed(1)}% (${record.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(record.pnl_usd).toFixed(2)})`,
+          record.pnl_usd >= 0 ? "good" : "bad");
     return;
   }
   const saveNote = e.target.closest("[data-save-note]");
@@ -3057,6 +3341,11 @@ try {
   renderResults();
   $("#auto-scan").checked = !!PREFS.autoScan;
   $("#auto-check").checked = !!PREFS.autoCheck;
+  $("#notify-toggle").checked = !!PREFS.notify;
+  $("#feed-auto").checked = !!PREFS.feedAuto;
+  $("#feed-sort").value = PREFS.feedSort || "smart";
+  $("#notify-toggle").addEventListener("change", (e) => enableNotifications(e.target.checked));
+  scheduleFeedAuto();
   scheduleAutoScan();
   scheduleAutoCheck();
   scheduleReprice();
