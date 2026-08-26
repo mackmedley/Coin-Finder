@@ -1473,9 +1473,9 @@ const PLAYS = [
     short: "Quick flip",
     blurb: "In and out fast. Volume accelerating right now with buyers in control — the most profitable and the most fragile. Minutes to hours, and it needs watching.",
     hold: "minutes–hours",
-    test: (c) => velocity(c) >= 1.5 && c.price_change_h1 > 3 && c.buy_ratio_h1 >= 0.55
-      && (c.buys_h1 + c.sells_h1) >= 30 && c.liquidity_usd >= 25000
-      && (c.score_breakdown.safety || 0) >= 0.5 && notAlreadyPumped(c),
+    test: (c) => velocity(c) >= 1.25 && c.price_change_h1 > 2 && c.buy_ratio_h1 >= 0.52
+      && (c.buys_h1 + c.sells_h1) >= 20 && c.liquidity_usd >= 20000
+      && (c.score_breakdown.safety || 0) >= 0.45 && notAlreadyPumped(c),
     rank: (c) => velocity(c) * (1 + c.price_change_h1 / 100),
     why: (c) => [
       `Trading ${velocity(c).toFixed(1)}× its normal hourly volume right now`,
@@ -1490,9 +1490,9 @@ const PLAYS = [
     blurb: "Ride a trend, not a candle. Up over 6h and 24h with no vertical spike — check it a few times a day. Hours to a few days.",
     hold: "hours–days",
     test: (c) => c.price_change_h6 > 0 && c.price_change_h24 > 0
-      && c.price_change_h1 > -5 && c.price_change_h1 < 60
-      && c.turnover_ratio >= 0.5 && c.liquidity_usd >= 40000
-      && (c.score_breakdown.safety || 0) >= 0.6 && c.age_hours >= 24,
+      && c.price_change_h1 > -8 && c.price_change_h1 < 80
+      && c.turnover_ratio >= 0.35 && c.liquidity_usd >= 30000
+      && (c.score_breakdown.safety || 0) >= 0.55 && c.age_hours >= 12,
     rank: (c) => c.score,
     why: (c) => [
       `Up ${c.price_change_h6.toFixed(0)}% over 6h and ${c.price_change_h24.toFixed(0)}% over 24h`,
@@ -1536,6 +1536,8 @@ const PLAYS = [
 /* Every coin that passes the filters gets exactly one buy type — the first
    play it qualifies for. Anything that fits no play is still tradeable, it
    just has no obvious angle, so it's grouped honestly rather than hidden. */
+const PLAY_CARD_LIMIT = 6;
+
 const UNCLASSIFIED = {
   id: "other",
   title: "No clear angle",
@@ -1592,14 +1594,22 @@ function renderPicks() {
   if (!state.scannedAt) { target.innerHTML = ""; return; }
 
   const sections = PLAYS.map((play) => {
-    const matches = state.passing
+    const all = state.passing
       .filter((c) => classify(c).id === play.id)
-      .sort((a, b) => play.rank(b) - play.rank(a))
-      .slice(0, 3);
-    if (!matches.length) return "";
+      .sort((a, b) => play.rank(b) - play.rank(a));
+    if (!all.length) return "";
+    const expanded = state.playExpanded[play.id];
+    const limit = expanded ? all.length : PLAY_CARD_LIMIT;
+    const shown = all.slice(0, limit);
+    const more = all.length - shown.length;
     return `<div class="play">
-      <div class="picks-head"><h2>${escapeHtml(play.title)}</h2><span>${escapeHtml(play.blurb)}</span></div>
-      <div class="picks">${matches.map((c) => playCard(c, play)).join("")}</div>
+      <div class="picks-head">
+        <h2>${escapeHtml(play.title)}</h2>
+        <span>${escapeHtml(play.blurb)}</span>
+      </div>
+      <div class="picks">${shown.map((c) => playCard(c, play)).join("")}</div>
+      ${more > 0 || expanded ? `<button class="section-toggle" data-play-more="${play.id}">${
+        more > 0 ? `▸ Show ${more} more ${escapeHtml(play.title.toLowerCase())}` : "▾ Show fewer"}</button>` : ""}
     </div>`;
   }).filter(Boolean).join("");
 
@@ -1630,6 +1640,7 @@ const state = {
   expandedKey: null,
   showRejected: false,
   showHistory: false,
+  playExpanded: {},
   alerted: {},
   signals: null,
   posExpandedKey: null,
@@ -3001,6 +3012,13 @@ $("#view-find").addEventListener("click", async (e) => {
     const key = sort.dataset.sort;
     if (state.sortKey === key) state.sortDir *= -1;
     else { state.sortKey = key; state.sortDir = key === "symbol" ? 1 : -1; }
+    renderResults();
+    return;
+  }
+  const playMore = e.target.closest("[data-play-more]");
+  if (playMore) {
+    const id = playMore.dataset.playMore;
+    state.playExpanded[id] = !state.playExpanded[id];
     renderResults();
     return;
   }
