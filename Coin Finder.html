@@ -313,6 +313,31 @@
   .pick .p-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .play { margin-bottom: 18px; }
 
+  tr.group-row td {
+    background: var(--panel-2);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 9px 12px;
+  }
+  .g-title { font-weight: 700; font-size: 12.5px; letter-spacing: 0.3px; }
+  .g-sub { color: var(--accent); font-size: 11.5px; margin-left: 8px; }
+  .g-blurb { display: block; color: var(--faint); font-size: 11.5px; margin-top: 2px; }
+
+  .type-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .type-badge.t-hour { color: var(--warn); border-color: rgba(250,178,25,0.4); }
+  .type-badge.t-climb { color: var(--accent); border-color: rgba(57,135,229,0.4); }
+  .type-badge.t-hold { color: var(--good); border-color: rgba(63,185,80,0.4); }
+  .type-badge.t-fresh { color: var(--serious); border-color: rgba(236,131,90,0.45); }
+
   /* stop -> target progress rail */
   .rail { margin: 2px 0 0; }
   .rail-track {
@@ -520,6 +545,7 @@
     <div class="toolbar">
       <input id="search" class="search" type="search" placeholder="Filter coins…  ( / )">
       <button id="btn-lookup" class="ghost">Look up any coin</button>
+      <button id="btn-group" class="ghost small">Grouped by buy type</button>
       <div class="chips" id="chain-chips"></div>
       <div class="spacer"></div>
       <label class="switch"><input type="checkbox" id="auto-scan">Auto-rescan 2&nbsp;min</label>
@@ -1443,8 +1469,9 @@ function notAlreadyPumped(c) {
 const PLAYS = [
   {
     id: "hour",
-    title: "Moving in the next hour",
-    blurb: "Volume accelerating right now with buyers in control — the fastest and the most fragile. Minutes to hours, watch it closely.",
+    title: "Quick flips",
+    short: "Quick flip",
+    blurb: "In and out fast. Volume accelerating right now with buyers in control — the most profitable and the most fragile. Minutes to hours, and it needs watching.",
     hold: "minutes–hours",
     test: (c) => velocity(c) >= 1.5 && c.price_change_h1 > 3 && c.buy_ratio_h1 >= 0.55
       && (c.buys_h1 + c.sells_h1) >= 30 && c.liquidity_usd >= 25000
@@ -1458,8 +1485,9 @@ const PLAYS = [
   },
   {
     id: "climb",
-    title: "Steady climbers",
-    blurb: "Up over 6h and 24h without a vertical spike — a trend rather than a candle. Hours to a few days.",
+    title: "Swing trades",
+    short: "Swing",
+    blurb: "Ride a trend, not a candle. Up over 6h and 24h with no vertical spike — check it a few times a day. Hours to a few days.",
     hold: "hours–days",
     test: (c) => c.price_change_h6 > 0 && c.price_change_h24 > 0
       && c.price_change_h1 > -5 && c.price_change_h1 < 60
@@ -1475,7 +1503,8 @@ const PLAYS = [
   {
     id: "hold",
     title: "Long holds",
-    blurb: "Survived past the rug window with deep liquidity and a real presence. The ones you can size up and sit on.",
+    short: "Hold",
+    blurb: "Buy and sit. Survived past the rug window with deep liquidity and a real presence — the only kind you can size up. Days to weeks.",
     hold: "days–weeks",
     test: (c) => c.age_hours >= 24 * 7 && c.liquidity_usd >= 100000
       && (c.score_breakdown.safety || 0) >= 0.7 && c.turnover_ratio >= 0.3
@@ -1489,8 +1518,9 @@ const PLAYS = [
   },
   {
     id: "fresh",
-    title: "Just launched",
-    blurb: "Hours old with early traction. The biggest upside and by far the most likely to go to zero — smallest size here.",
+    title: "Lottery tickets",
+    short: "Lottery",
+    blurb: "A bet, not a trade. Hours old with early traction: the biggest upside and by far the most likely to go to zero. Smallest size you can be bothered with.",
     hold: "highest risk",
     test: (c) => c.age_hours < 24 && c.age_hours > 0 && c.liquidity_usd >= 20000
       && c.buy_ratio_h1 >= 0.55 && c.volume_h24 >= 20000 && (c.buys_h1 + c.sells_h1) >= 20,
@@ -1502,6 +1532,30 @@ const PLAYS = [
     ],
   },
 ];
+
+/* Every coin that passes the filters gets exactly one buy type — the first
+   play it qualifies for. Anything that fits no play is still tradeable, it
+   just has no obvious angle, so it's grouped honestly rather than hidden. */
+const UNCLASSIFIED = {
+  id: "other",
+  title: "No clear angle",
+  short: "No angle",
+  hold: "your call",
+  blurb: "Passed every safety filter but doesn't fit a play — no strong momentum, no depth story, nothing urgent. Fine to ignore.",
+};
+
+function classify(c) {
+  for (const play of PLAYS) {
+    try {
+      if (play.test(c)) return play;
+    } catch (err) { /* a malformed candidate simply isn't classified */ }
+  }
+  return UNCLASSIFIED;
+}
+
+function playById(id) {
+  return PLAYS.find((p) => p.id === id) || UNCLASSIFIED;
+}
 
 function playCard(c, play) {
   const key = candidateKey(c);
@@ -1537,18 +1591,11 @@ function renderPicks() {
   const target = $("#find-picks");
   if (!state.scannedAt) { target.innerHTML = ""; return; }
 
-  const used = new Set();
   const sections = PLAYS.map((play) => {
     const matches = state.passing
-      .filter((c) => {
-        try { return play.test(c); } catch (err) { return false; }
-      })
-      // A coin belongs to the first play it qualifies for, so the same name
-      // doesn't fill every section.
-      .filter((c) => !used.has(candidateKey(c)))
+      .filter((c) => classify(c).id === play.id)
       .sort((a, b) => play.rank(b) - play.rank(a))
       .slice(0, 3);
-    matches.forEach((c) => used.add(candidateKey(c)));
     if (!matches.length) return "";
     return `<div class="play">
       <div class="picks-head"><h2>${escapeHtml(play.title)}</h2><span>${escapeHtml(play.blurb)}</span></div>
@@ -1564,7 +1611,7 @@ function renderPicks() {
  * App state
  * ------------------------------------------------------------------ */
 
-let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart" }, readStore(STORE_PREFS, {}));
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart", grouped: true }, readStore(STORE_PREFS, {}));
 // v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
 if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
 function savePrefs() { writeStore(STORE_PREFS, PREFS); }
@@ -1734,13 +1781,14 @@ function renderResults() {
       return `<th class="sortable ${sorted ? "sorted" : ""}" data-sort="${key}" style="${cls === "num" ? "text-align:right" : ""}">${label}<span class="arrow">${arrow}</span></th>`;
     }).join("") + "<th></th>";
 
-    const body = rows.map((c) => {
+    const rowHtml = (c) => {
       const key = candidateKey(c);
       const expanded = state.expandedKey === key;
       return `<tr class="row" data-key="${escapeHtml(key)}">
         <td class="num"><span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span></td>
         <td><div class="sym">${escapeHtml(c.symbol)}<span class="name">${escapeHtml(c.name)}</span></div>
-            <span class="chain-tag">${escapeHtml(c.chain)}</span></td>
+            <span class="chain-tag">${escapeHtml(c.chain)}</span>
+            ${PREFS.grouped ? "" : `<span class="type-badge t-${classify(c).id}">${escapeHtml(classify(c).short)}</span>`}</td>
         <td class="num">${fmtPrice(c.price_usd)}</td>
         <td class="num">${fmtPct(c.price_change_h1)}</td>
         <td class="num">${fmtPct(c.price_change_h6)}</td>
@@ -1750,7 +1798,27 @@ function renderResults() {
         <td class="num">${fmtAge(c.age_hours)}</td>
         <td>${watchStar(key)}</td>
       </tr>${expanded ? detailRowHtml(c, colspan) : ""}`;
-    }).join("");
+    };
+
+    let body;
+    if (PREFS.grouped) {
+      // One table, group header rows — keeps every column aligned across groups.
+      const order = PLAYS.map((p) => p.id).concat(UNCLASSIFIED.id);
+      const buckets = new Map(order.map((id) => [id, []]));
+      for (const c of rows) buckets.get(classify(c).id).push(c);
+      body = order.map((id) => {
+        const group = buckets.get(id);
+        if (!group.length) return "";
+        const play = playById(id);
+        return `<tr class="group-row"><td colspan="${colspan}">
+            <span class="g-title">${escapeHtml(play.title)}</span>
+            <span class="g-sub">${group.length} coin${group.length === 1 ? "" : "s"} · ${escapeHtml(play.hold)}</span>
+            <span class="g-blurb">${escapeHtml(play.blurb)}</span>
+          </td></tr>` + group.map(rowHtml).join("");
+      }).join("");
+    } else {
+      body = rows.map(rowHtml).join("");
+    }
 
     target.innerHTML = `<div class="table-wrap"><table>
       <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
@@ -2487,16 +2555,21 @@ function renderLearn() {
        four trades with different hold times — a coin appears in one section only, the first it
        qualifies for, and every card shows the pair's age so freshness is never hidden:</p>
     <ul>
-      <li><b>Moving in the next hour</b> — trading well above its normal hourly volume with buyers
-          dominant. Fastest and most fragile; minutes to hours, and it needs watching.</li>
-      <li><b>Steady climbers</b> — up over 6h <i>and</i> 24h without a vertical candle. A trend
-          rather than a spike; hours to days.</li>
+      <li><b>Quick flips</b> — trading well above its own normal hourly volume with buyers
+          dominant. In and out; minutes to hours, and it needs watching.</li>
+      <li><b>Swing trades</b> — up over 6h <i>and</i> 24h without a vertical candle. A trend
+          rather than a spike; check it a few times a day. Hours to days.</li>
       <li><b>Long holds</b> — a week or more old, deep liquidity, high safety, public links. The
-          ones you can size up and sit on; days to weeks.</li>
-      <li><b>Just launched</b> — under a day old with early traction. Biggest upside, and by far
-          the most likely to go to zero. Smallest size here, always.</li>
+          only kind you can size up and sit on; days to weeks.</li>
+      <li><b>Lottery tickets</b> — under a day old with early traction. Biggest upside, and by far
+          the most likely to go to zero. Smallest size you can be bothered with.</li>
+      <li><b>No clear angle</b> — passed every safety filter but fits none of the above. Tradeable,
+          just nothing pushing it. Fine to ignore.</li>
     </ul>
-    <p>Empty sections are normal and are not a failure — most scans deserve zero buys.</p>
+    <p>The whole results table is grouped this way too, so you're never reading one undifferentiated
+       list — and the <b>Grouped by buy type</b> button flips it back to a flat list with a type
+       badge on each row if you prefer. Empty sections are normal, not a failure: most scans deserve
+       zero buys.</p>
   </section>
   <section>
     <h2>Tracking what you bought</h2>
@@ -3176,6 +3249,13 @@ async function runLookup() {
   }).join("");
 }
 
+$("#btn-group").addEventListener("click", () => {
+  PREFS.grouped = !PREFS.grouped;
+  savePrefs();
+  $("#btn-group").textContent = PREFS.grouped ? "Grouped by buy type" : "One flat list";
+  renderResults();
+});
+
 $("#btn-lookup").addEventListener("click", () => {
   $("#lookup-q").value = "";
   $("#lookup-results").innerHTML = "";
@@ -3419,6 +3499,7 @@ try {
   $("#auto-scan").checked = !!PREFS.autoScan;
   $("#auto-check").checked = !!PREFS.autoCheck;
   $("#notify-toggle").checked = !!PREFS.notify;
+  $("#btn-group").textContent = PREFS.grouped ? "Grouped by buy type" : "One flat list";
   $("#feed-auto").checked = !!PREFS.feedAuto;
   $("#feed-sort").value = PREFS.feedSort || "smart";
   $("#notify-toggle").addEventListener("change", (e) => enableNotifications(e.target.checked));
