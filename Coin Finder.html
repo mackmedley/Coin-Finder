@@ -1810,6 +1810,83 @@ function renderPosTiles(signals) {
     <div class="tile"><div class="t-label">Exit signals</div><div class="t-value">${actionable}</div></div>`;
 }
 
+/* ---- post-buy plan: what to actually do, in prices not adjectives ---- */
+
+/** The exits that bind right now, as real prices with distances. */
+function exitLevels(s) {
+  const p = s.position;
+  const r = CONFIG.sell_rules;
+  const peak = Math.max(p.peak_price_usd || 0, s.price_usd || 0);
+  const target = p.entry_price_usd * (1 + r.take_profit_pct / 100);
+  const hardStop = p.entry_price_usd * (1 + r.stop_loss_pct / 100);
+  const trailStop = peak * (1 + r.trailing_stop_pct / 100);
+  // Once you're up, the trailing stop usually sits ABOVE the original stop —
+  // that higher one is the level that actually protects the position.
+  const floor = Math.max(hardStop, trailStop);
+  const away = (level) => s.price_usd > 0 ? ((level - s.price_usd) / s.price_usd) * 100 : 0;
+  return {
+    peak, target, hardStop, trailStop, floor,
+    toTarget: away(target), toFloor: away(floor),
+    floorIsTrailing: trailStop > hardStop,
+    lockedIn: ((floor - p.entry_price_usd) / p.entry_price_usd) * 100,
+  };
+}
+
+/** One concrete instruction, chosen by verdict and how the trade is doing. */
+function planHeadline(s, levels) {
+  const pnl = s.pnl_pct;
+  if (s.stale) return ["Can't price it right now", "No live data came back. Check the coin in FOMO directly before doing anything — don't assume this is fine."];
+  if (s.verdict === "URGENT SELL") return ["Exit now", "The pool is draining. Exit while a fill is still possible — the price you see may not be the price you get."];
+  if (s.verdict === "SELL") return ["Sell — a rule you set has fired", "You wrote this rule when you were calm. Follow it now, while you aren't."];
+  if (s.verdict === "TRIM") return ["Take some off", "Interest is fading. Selling part locks in progress and leaves a smaller position running."];
+  if (pnl <= -15) return ["Hold to the stop — do not add", `Down ${pnl.toFixed(0)}%. Averaging down turns one bad trade into a bigger one. Your stop is ${fmtPrice(levels.floor)}.`];
+  if (pnl < 0) return ["Nothing to do yet", `Down ${Math.abs(pnl).toFixed(1)}% and inside normal noise. The stop at ${fmtPrice(levels.floor)} is the plan.`];
+  if (pnl >= CONFIG.sell_rules.take_profit_pct) return ["Target reached — take profit", "This is exactly what you were waiting for. Sell, or sell most and let a small piece run."];
+  if (pnl >= 25) return ["Consider taking half off", `Up ${pnl.toFixed(0)}%. Selling half and treating ${fmtPrice(s.position.entry_price_usd)} as your floor makes the rest a free roll.`];
+  if (pnl >= 8) return ["Let it work", `Up ${pnl.toFixed(0)}%. Nothing to do until either ${fmtPrice(levels.target)} or ${fmtPrice(levels.floor)}.`];
+  return ["Let it work", `Flat so far. The trade needs room — nothing to do until ${fmtPrice(levels.target)} or ${fmtPrice(levels.floor)}.`];
+}
+
+/** The compact version for the row: the two numbers that matter. */
+function nextTriggers(s) {
+  if (s.stale) return "";
+  const l = exitLevels(s);
+  return `<div class="feed-meta" style="margin-top:4px">
+    <span>${l.toTarget > 0 ? `+${l.toTarget.toFixed(0)}% to target` : "target reached"}</span>
+    <span>${l.toFloor < 0 ? `${Math.abs(l.toFloor).toFixed(0)}% above ${l.floorIsTrailing ? "trailing stop" : "stop"}` : "at/below stop"}</span>
+  </div>`;
+}
+
+function planHtml(s) {
+  const p = s.position;
+  const l = exitLevels(s);
+  const [headline, detail] = planHeadline(s, l);
+  const riskUsd = p.amount_usd * Math.abs(CONFIG.sell_rules.stop_loss_pct) / 100;
+  const targetUsd = p.amount_usd * CONFIG.sell_rules.take_profit_pct / 100;
+  const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
+
+  const rows = s.stale ? "" : `
+    <dl class="kv">
+      <dt>Take profit at</dt><dd>${fmtPrice(l.target)} <span style="color:var(--faint)">${l.toTarget > 0 ? `+${l.toTarget.toFixed(1)}% away` : "reached"}</span></dd>
+      <dt>${l.floorIsTrailing ? "Trailing stop" : "Stop loss"} at</dt><dd>${fmtPrice(l.floor)} <span style="color:var(--faint)">${l.toFloor < 0 ? `${Math.abs(l.toFloor).toFixed(1)}% below` : "triggered"}</span></dd>
+      ${l.floorIsTrailing ? `<dt>Locked in</dt><dd class="${l.lockedIn >= 0 ? "pos" : "neg"}">${l.lockedIn >= 0 ? "+" : ""}${l.lockedIn.toFixed(1)}% vs entry</dd>` : ""}
+      <dt>Risk if stopped</dt><dd class="neg">−$${riskUsd.toFixed(2)}</dd>
+      <dt>Gain if target hits</dt><dd class="pos">+$${targetUsd.toFixed(2)}</dd>
+      <dt>Exit still open?</dt><dd>${fmtCompact(p.entry_liquidity_usd)} → ${s.liquidity_change_pct ? fmtPct(s.liquidity_change_pct) : "—"} liquidity since entry</dd>
+      <dt>Held</dt><dd>${fmtAge(holdHours)}</dd>
+    </dl>`;
+
+  return `<div>
+    <h4>What to do now</h4>
+    <div class="plan" style="margin-top:0">
+      <b>${escapeHtml(headline)}</b><br>${escapeHtml(detail)}
+    </div>
+    ${rows}
+    <div class="feed-err" style="padding-top:6px">Swapping in and out of a meme coin usually costs a few
+      percent in fees and slippage, so a trade needs to clear that before it's really green.</div>
+  </div>`;
+}
+
 /** Where the price sits between your stop and your take-profit. */
 function progressRail(s) {
   if (s.stale || !s.price_usd) return "";
@@ -1828,19 +1905,18 @@ function posDetailHtml(s, colspan) {
   const p = s.position;
   const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
   return `<tr class="detail"><td colspan="${colspan}"><div class="detail-inner">
+    ${planHtml(s)}
     <div>
       <h4>Position</h4>
       <dl class="kv">
         <dt>Opened</dt><dd>${new Date(p.opened_at * 1000).toLocaleString()} (${fmtAge(holdHours)} ago)</dd>
         <dt>Size</dt><dd>${fmtCompact(p.amount_usd)}</dd>
+        <dt>Entry</dt><dd>${fmtPrice(p.entry_price_usd)}</dd>
         <dt>Peak price</dt><dd>${fmtPrice(Math.max(p.peak_price_usd, s.price_usd || 0))}</dd>
         <dt>From peak</dt><dd>${s.stale ? "—" : fmtPct(s.drawdown_from_peak_pct)}</dd>
-        <dt>Liquidity vs entry</dt><dd>${s.stale ? "—" : fmtPct(s.liquidity_change_pct)}</dd>
         <dt>Pair</dt><dd style="font-size:11.5px">${escapeHtml(p.pair_address.slice(0, 18))}…</dd>
       </dl>
-    </div>
-    <div>
-      <h4>Note</h4>
+      <h4 style="margin-top:12px">Note</h4>
       <div style="display:flex; gap:8px;">
         <input id="note-input" type="text" value="${escapeHtml(p.note || "")}" placeholder="Why did you buy?">
         <button class="small" data-save-note="${escapeHtml(p.key)}">Save</button>
@@ -1911,7 +1987,8 @@ function renderSignals() {
     return `<tr class="row" data-poskey="${escapeHtml(p.key)}">
       <td><span class="verdict ${cls}">${s.verdict}</span></td>
       <td><div class="sym">${escapeHtml(p.symbol)}</div><span class="chain-tag">${escapeHtml(p.chain)}</span>
-          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul></td>
+          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+          ${nextTriggers(s)}</td>
       <td style="min-width:150px">${sparklineSvg(p.history)}${progressRail(s)}</td>
       <td class="num">${fmtPrice(p.entry_price_usd)}</td>
       <td class="num">${fmtPrice(s.price_usd)}</td>
