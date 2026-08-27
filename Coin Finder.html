@@ -691,6 +691,17 @@
     <div><label for="set-maxage">Max age (days)</label><input id="set-maxage" type="number" min="0" step="any"></div>
     <div><label for="set-fdv">Max FDV ÷ liquidity</label><input id="set-fdv" type="number" min="0" step="any"></div>
     <div><label for="set-buyratio">Min 1h buys (%)</label><input id="set-buyratio" type="number" min="0" max="100" step="any"></div>
+    <div class="settings-section">X (Twitter) feed — optional</div>
+    <div class="full">
+      <p class="hint" style="margin:2px 0 0">X has no free API and its embed widget no longer renders for
+      logged-out visitors, so nothing can read X for free. If you have access to any service that returns
+      tweets as JSON, paste its URL here and the Feed will pull real posts. Use <code>{query}</code> where the
+      search term goes. Your key is stored <b>only in this browser</b> — never in the site's code.</p>
+      <label for="set-xurl">Tweet source URL</label>
+      <input id="set-xurl" type="text" placeholder="https://api.example.com/search?q={query}">
+      <label for="set-xkey">Authorization header (optional)</label>
+      <input id="set-xkey" type="password" placeholder="Bearer xxxxxxxx">
+    </div>
     <div class="settings-section">Position sizing (optional)</div>
     <div><label for="set-bankroll">Bankroll ($)</label><input id="set-bankroll" type="number" min="0" step="any" placeholder="e.g. 1000"></div>
     <div><label for="set-risk">Risk per trade (%)</label><input id="set-risk" type="number" min="0.1" max="100" step="any" placeholder="1"></div>
@@ -1621,7 +1632,7 @@ function renderPicks() {
  * App state
  * ------------------------------------------------------------------ */
 
-let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart", grouped: true }, readStore(STORE_PREFS, {}));
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart", grouped: true, xUrl: "", xKey: "" }, readStore(STORE_PREFS, {}));
 // v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
 if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
 function savePrefs() { writeStore(STORE_PREFS, PREFS); }
@@ -2262,6 +2273,70 @@ function parseProfiles(payload) {
   }));
 }
 
+/* X posts, when a source is configured.
+ *
+ * No free way to read X exists: no free API tier, the public Nitter mirrors
+ * are gone, and X's own embed no longer renders for logged-out visitors.
+ * Scraping X breaks its terms, so this does the one legitimate thing left —
+ * it reads from whatever tweet source YOU have access to. Any endpoint that
+ * returns JSON works; the three common response shapes are all handled. */
+function parseTweets(payload) {
+  let rows = null;
+  let users = {};
+
+  if (Array.isArray(payload)) {
+    rows = payload;                                   // plain array
+  } else if (payload && Array.isArray(payload.data)) {
+    rows = payload.data;                              // X API v2
+    const list = dig(payload, "includes", "users");
+    if (Array.isArray(list)) for (const u of list) users[u.id] = u.username;
+  } else if (payload && Array.isArray(payload.tweets)) {
+    rows = payload.tweets;                            // several resellers
+  } else if (payload && Array.isArray(payload.results)) {
+    rows = payload.results;
+  }
+  if (!rows) throw new Error("unrecognised tweet payload");
+
+  return rows.slice(0, 25).map((t) => {
+    const author = String(
+      dig(t, "author", "userName") || dig(t, "author", "username") ||
+      dig(t, "user", "screen_name") || t.username || users[t.author_id] || "");
+    const id = String(t.id || t.id_str || t.tweet_id || "");
+    const created = t.created_at || t.createdAt || t.date || "";
+    const likes = num(t.likeCount || t.like_count || dig(t, "public_metrics", "like_count"));
+    return {
+      kind: "tweet",
+      title: String(t.text || t.full_text || t.content || ""),
+      url: String(t.url || t.tweetUrl ||
+        (author && id ? `https://x.com/${author}/status/${id}` : xSearchUrl("memecoin"))),
+      source: author ? "@" + author : "X",
+      time: created ? (Date.parse(created) || 0) : 0,
+      score: likes || 0,
+      id: id ? "tweet|" + id : undefined,
+      meme: true,
+    };
+  }).filter((t) => t.title);
+}
+
+function xFeedUrl() {
+  const template = String(PREFS.xUrl || "").trim();
+  if (!template || !/^https:\/\//i.test(template)) return null;
+  const query = "(memecoin OR pumpfun OR \"meme coin\") -is:retweet";
+  return template.indexOf("{query}") >= 0
+    ? template.replace("{query}", encodeURIComponent(query))
+    : template;
+}
+
+async function fetchTweets() {
+  const url = xFeedUrl();
+  if (!url) return null;
+  const headers = { Accept: "application/json" };
+  if (PREFS.xKey) headers.Authorization = PREFS.xKey;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return parseTweets(await res.json());
+}
+
 async function loadFeed(force) {
   if (FEED.loading) return;
   if (!force && FEED.loadedAt && Date.now() - FEED.loadedAt < 5 * 60 * 1000) { renderFeed(); return; }
@@ -2279,6 +2354,7 @@ async function loadFeed(force) {
     ["Paid boosts", API + "/token-boosts/top/v1", parseBoosts],
     ["New profiles", API + "/token-profiles/latest/v1", parseProfiles],
   ];
+  if (xFeedUrl()) sources.push(["X posts", null, null]);
   for (const sub of SUBREDDITS) {
     sources.push([`r/${sub}`, `https://www.reddit.com/r/${sub}/hot.json?limit=15&raw_json=1`,
                   (p) => parseReddit(p, sub)]);
@@ -2298,7 +2374,7 @@ async function loadFeed(force) {
     })(),
     ...sources.map(async ([name, url, parse]) => {
       try {
-        const parsed = parse(await getJson(url));
+        const parsed = url === null ? await fetchTweets() : parse(await getJson(url));
         if (!parsed.length) throw new Error("empty");
         items.push(...parsed);
         okCount++;
@@ -2333,6 +2409,7 @@ const FEED_FILTERS = [
   ["trending_pool", "Trending pools"],
   ["newpool", "Brand new"],
   ["news", "News"],
+  ["tweet", "X posts"],
   ["reddit", "Reddit"],
   ["trending", "Searches"],
   ["promo", "Promoted"],
@@ -2410,7 +2487,7 @@ function renderFeed(loading) {
   }
 
   // Filter chips
-  $("#feed-chips").innerHTML = FEED_FILTERS.map(([key, label]) => {
+  $("#feed-chips").innerHTML = FEED_FILTERS.filter(([key]) => key !== "tweet" || xFeedUrl()).map(([key, label]) => {
     const n = key === "all" ? FEED.items.length : FEED.items.filter((i) => i.kind === key).length;
     return `<button class="chip ${FEED.filter === key ? "on" : ""}" data-feed-filter="${key}">${label}${n ? ` <span style="opacity:.65">${n}</span>` : ""}</button>`;
   }).join("");
@@ -2418,7 +2495,7 @@ function renderFeed(loading) {
   // Status line
   const status = $("#feed-status");
   if (loading && !FEED.items.length) {
-    status.innerHTML = `<div class="notice"><p style="margin:0">Loading ${SUBREDDITS.length + 7} sources…</p></div>`;
+    status.innerHTML = `<div class="notice"><p style="margin:0">Loading sources…</p></div>`;
   } else if (FEED.loadedAt && FEED.failed.length && !FEED.ok) {
     status.innerHTML = networkErrorNotice(new Error("every feed source failed"));
   } else if (FEED.loadedAt && FEED.failed.length) {
@@ -2442,9 +2519,15 @@ function renderFeed(loading) {
 
   // X handoff panel
   const tickers = FEED.items.filter((i) => i.kind === "trending" && i.meme).slice(0, 6);
+  const xOn = !!xFeedUrl();
+  const xLoaded = FEED.items.filter((i) => i.kind === "tweet").length;
   $("#feed-social").innerHTML = `
     <div class="feed-sec">
-      <h2>Social <span class="sub">X has no free API — these open X's own search</span></h2>
+      <h2>Social <span class="sub">${xOn
+        ? (xLoaded ? `${xLoaded} X posts in the stream` : "X source set but returned nothing — check Settings")
+        : "no X source set — these open X's own search"}</span></h2>
+      ${xOn ? "" : `<div class="feed-err" style="padding-bottom:6px">Want real posts in the stream?
+        Settings → <b>X (Twitter) feed</b> takes any URL that returns tweets as JSON.</div>`}
       <div class="chips" style="margin:6px 0">
         ${tickers.map((t) => `<button class="chip" data-open-url="${escapeHtml(xSearchUrl("$" + t.symbol))}">$${escapeHtml(t.symbol)} ↗</button>`).join("")}
         <button class="chip" data-open-url="${escapeHtml(xSearchUrl("memecoin OR pumpfun min_faves:50"))}">Meme chatter ↗</button>
@@ -2646,11 +2729,19 @@ function renderLearn() {
        DEX data most meme scanners run on), DexScreener's paid boosts and new profiles, and the
        Fear &amp; Greed index. Each loads independently — if one is blocked on your network the
        rest still work, and the status line names what's missing.</p>
-    <p><b>X/Twitter is not read, on purpose.</b> X has no free API, the public Nitter mirrors
-       that used to work have collapsed, and scraping X breaks its terms of service. Rather than
-       ship something that silently breaks or misbehaves, the Feed <b>hands off</b>: the Social
-       panel and every coin's <b>Search X</b> button open X's own live search for that ticker or
-       contract address — the search you'd type yourself, one tap away.</p>
+    <p><b>X/Twitter needs a source you provide.</b> Three things are true at once: X has no free
+       API tier, the public Nitter mirrors that used to work have collapsed, and X's own embed
+       widget now renders only for logged-in visitors — it fails silently for everyone else.
+       Scraping X breaks its terms of service, so this app will not do that.</p>
+    <p>What it does instead: <b>Settings → X (Twitter) feed</b> accepts any URL that returns tweets
+       as JSON — a paid X API key behind your own small proxy, a third-party tweet provider, or
+       anything else you have access to. Put <code>{query}</code> where the search term belongs, add
+       an Authorization header if the service needs one, and real X posts join the Feed stream with
+       their own filter chip. Your key is stored <b>only in your browser</b>, never in the site's
+       code, and the site is public so it could never hold a secret anyway.</p>
+    <p>With no source set, the Feed still <b>hands off</b>: the Social panel and every coin's
+       <b>Search X</b> button open X's own live search for that ticker or contract address — the
+       search you'd type yourself, one tap away.</p>
     <p>Treat all of it as <b>where to look, never what to buy</b>. Hype is how exit liquidity gets
        recruited: by the time something is loud everywhere, you may be the buyer someone was
        waiting for. Any coin in the feed has a <b>Score it</b> button that runs it through the
@@ -3380,6 +3471,8 @@ function fillSettings() {
   $("#set-maxage").value = CONFIG.filters.max_age_days;
   $("#set-fdv").value = CONFIG.filters.max_fdv_to_liquidity_ratio;
   $("#set-buyratio").value = Math.round(CONFIG.filters.min_buy_ratio_h1 * 100);
+  $("#set-xurl").value = PREFS.xUrl || "";
+  $("#set-xkey").value = PREFS.xKey || "";
   $("#set-bankroll").value = PREFS.bankroll || "";
   $("#set-risk").value = PREFS.risk_pct;
   $("#set-tp").value = CONFIG.sell_rules.take_profit_pct;
@@ -3406,6 +3499,8 @@ $("#set-save").addEventListener("click", () => {
   CONFIG.sell_rules.stop_loss_pct = numOr($("#set-sl").value, DEFAULTS.sell_rules.stop_loss_pct);
   CONFIG.sell_rules.trailing_stop_pct = numOr($("#set-trail").value, DEFAULTS.sell_rules.trailing_stop_pct);
   CONFIG.sell_rules.liquidity_drop_pct = numOr($("#set-liqdrop").value, DEFAULTS.sell_rules.liquidity_drop_pct);
+  PREFS.xUrl = $("#set-xurl").value.trim();
+  PREFS.xKey = $("#set-xkey").value.trim();
   PREFS.bankroll = Math.max(0, numOr($("#set-bankroll").value, 0));
   PREFS.risk_pct = Math.min(100, Math.max(0.1, numOr($("#set-risk").value, 1)));
   savePrefs();
