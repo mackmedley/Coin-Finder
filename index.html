@@ -1,0 +1,3879 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:,">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coin Finder">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Coin Finder</title>
+<style>
+  /* Committed dark design: this is a local tool file, painted explicitly. */
+  :root {
+    --bg: #0b0e14;
+    --panel: #121722;
+    --panel-2: #1a212e;
+    --line: #232c3b;
+    --line-soft: #1c2431;
+    --text: #e8edf4;
+    --muted: #8b98a9;
+    --faint: #5c6879;
+    --accent: #3987e5;
+    --accent-soft: rgba(57,135,229,0.14);
+    --accent-ink: #06121f;
+    --good: #3fb950;
+    --good-soft: rgba(63,185,80,0.14);
+    --warn: #fab219;
+    --warn-soft: rgba(250,178,25,0.14);
+    --serious: #ec835a;
+    --serious-soft: rgba(236,131,90,0.16);
+    --critical: #d03b3b;
+    --meter-track: #1b3150;
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 8px 28px rgba(0,0,0,0.45);
+  }
+
+  * { box-sizing: border-box; }
+  html { scrollbar-color: var(--line) var(--bg); }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- header ---------- */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 12px 22px;
+    background: rgba(11,14,20,0.85);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 8px; margin-right: 6px; }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -0.2px; }
+  .brand span { color: var(--faint); font-size: 12px; }
+
+  .tabs {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .tabs button {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.active { background: var(--panel-2); color: var(--text); }
+  .tabs .badge {
+    display: inline-block;
+    min-width: 17px;
+    padding: 0 5px;
+    margin-left: 5px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .tabs .badge:empty { display: none; }
+
+  .spacer { flex: 1; }
+  .header-meta { color: var(--faint); font-size: 12px; }
+
+  /* ---------- buttons & inputs ---------- */
+
+  button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.06s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.small { padding: 4px 10px; font-size: 12.5px; border-radius: 6px; }
+  button.ghost { background: transparent; }
+  button.icon {
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1;
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted);
+  }
+  button.icon:hover:not(:disabled) { color: var(--text); border-color: var(--line); }
+  button.icon.on { color: var(--warn); }
+
+  input, select {
+    font: inherit;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 11px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input::placeholder { color: var(--faint); }
+
+  .switch { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+  .switch input { appearance: none; width: 30px; height: 17px; margin: 0; padding: 0; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); position: relative; cursor: pointer; transition: background 0.15s; }
+  .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+  .switch input:checked { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked::after { transform: translateX(13px); background: #fff; }
+
+  /* ---------- layout ---------- */
+
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 22px 70px; }
+  .view { display: none; }
+  .view.active { display: block; animation: fadein 0.18s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar .search { flex: 1 1 200px; max-width: 320px; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12.5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.13s;
+  }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- stat tiles ---------- */
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .tile .t-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .tile .t-value { font-size: 21px; font-weight: 600; }
+  .tile .t-delta { font-size: 12.5px; margin-top: 2px; }
+  .tile .t-delta.up { color: var(--good); }
+  .tile .t-delta.down { color: #f85149; }
+
+  /* ---------- notices, toasts ---------- */
+
+  .notice {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 13px 16px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+  }
+  .notice.error { border-left-color: var(--critical); }
+  .notice h3 { margin: 0 0 6px; font-size: 14.5px; }
+  .notice p { margin: 5px 0; color: var(--muted); }
+  .notice code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+
+  #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    box-shadow: var(--shadow);
+    padding: 10px 16px;
+    font-size: 13.5px;
+    max-width: 340px;
+    animation: toast-in 0.2s ease;
+  }
+  .toast.good { border-left: 3px solid var(--good); }
+  .toast.bad { border-left: 3px solid var(--critical); }
+  .toast.out { opacity: 0; transform: translateY(6px); transition: all 0.25s; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- tables ---------- */
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line-soft); }
+  th {
+    background: var(--panel);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    white-space: nowrap;
+    user-select: none;
+  }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: var(--text); }
+  th .arrow { font-size: 9px; margin-left: 3px; opacity: 0; }
+  th.sorted .arrow { opacity: 1; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.row { cursor: pointer; transition: background 0.1s; }
+  tbody tr.row:hover { background: var(--panel-2); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .sym { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .sym .name { color: var(--faint); font-weight: 400; font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chain-tag { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  .score {
+    display: inline-block;
+    min-width: 42px;
+    text-align: center;
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .score.hi { background: var(--good-soft); color: var(--good); }
+  .score.mid { background: var(--warn-soft); color: var(--warn); }
+  .score.lo { background: rgba(139,152,169,0.13); color: var(--muted); }
+
+  .pos { color: var(--good); }
+  .neg { color: #f85149; }
+
+  .flag {
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: 1px 3px 1px 0;
+    display: inline-block;
+    cursor: pointer;
+  }
+  .flag:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ---------- buy-now picks ---------- */
+
+  .picks-head { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; }
+  .picks-head h2 { font-size: 14px; margin: 0; }
+  .picks-head span { color: var(--faint); font-size: 12px; }
+  .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .pick {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--good);
+    border-radius: var(--radius);
+    padding: 13px 15px;
+  }
+  .pick .p-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .pick .p-top .sym { font-size: 15px; }
+  .pick .why { margin: 6px 0; padding-left: 16px; font-size: 12.5px; color: var(--muted); }
+  .pick .why li { margin: 2px 0; }
+  .pick .plan {
+    font-size: 12.5px;
+    background: var(--panel-2);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    margin: 8px 0;
+    color: var(--muted);
+  }
+  .pick .plan b { color: var(--text); }
+  .pick .p-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .play { margin-bottom: 18px; }
+
+  tr.group-row td {
+    background: var(--panel-2);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 9px 12px;
+  }
+  .g-title { font-weight: 700; font-size: 12.5px; letter-spacing: 0.3px; }
+  .g-sub { color: var(--accent); font-size: 11.5px; margin-left: 8px; }
+  .g-blurb { display: block; color: var(--faint); font-size: 11.5px; margin-top: 2px; }
+
+  .type-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .type-badge.t-hour { color: var(--warn); border-color: rgba(250,178,25,0.4); }
+  .type-badge.t-climb { color: var(--accent); border-color: rgba(57,135,229,0.4); }
+  .type-badge.t-hold { color: var(--good); border-color: rgba(63,185,80,0.4); }
+  .type-badge.t-fresh { color: var(--serious); border-color: rgba(236,131,90,0.45); }
+
+  /* stop -> target progress rail */
+  .rail { margin: 2px 0 0; }
+  .rail-track {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(208,59,59,0.55), rgba(139,152,169,0.3) 45%, rgba(63,185,80,0.55));
+  }
+  .rail-mark {
+    position: absolute;
+    top: -3px;
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--text);
+    box-shadow: 0 0 0 2px var(--panel);
+  }
+  .rail-legend { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-top: 3px; }
+
+  /* ---------- feed tab ---------- */
+
+  .feed-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 860px) { .feed-cols { grid-template-columns: 1fr; } }
+  .feed-sec {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .feed-sec h2 {
+    font-size: 12px;
+    margin: 0 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .feed-sec h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); font-size: 11.5px; }
+  .feed-item { padding: 13px 0; }
+  .feed-item + .feed-item { border-top: 1px solid var(--line-soft); }
+
+  .fi-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 5px; }
+  .kind {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .kind.k-news { color: var(--accent); border-color: rgba(57,135,229,0.4); }
+  .kind.k-reddit { color: var(--serious); border-color: rgba(236,131,90,0.4); }
+  .kind.k-tweet { color: var(--text); }
+  .kind.k-pool { color: var(--good); border-color: rgba(63,185,80,0.4); }
+  .kind.k-new { color: var(--warn); border-color: rgba(250,178,25,0.4); }
+  .kind.k-trend { color: var(--accent); }
+  .kind.k-promo { color: var(--faint); }
+
+  .fi-src { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .fi-time { font-size: 11.5px; color: var(--faint); }
+  .narr-tag {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(57,135,229,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(57,135,229,0.28);
+  }
+
+  .fi-title {
+    display: block;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .fi-title:hover { color: var(--accent); }
+  .fi-desc { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .fi-facts { margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fi-facts b { color: var(--text); font-weight: 600; }
+  .fi-facts .dot { margin: 0 7px; color: var(--line); }
+  .fi-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .fi-actions button { font-size: 11.5px; padding: 3px 9px; }
+
+  .fi-coins { margin-top: 7px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fi-coins-label { font-size: 11px; color: var(--faint); }
+  .coin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .coin-chip:hover { border-color: var(--accent); }
+  .coin-chip .score { min-width: 0; padding: 0 5px; font-size: 11px; }
+
+  /* narratives */
+  .narr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 8px; }
+  .narr {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .narr.on { border-color: var(--accent); }
+  .narr-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .narr-name { font-weight: 600; font-size: 13.5px; color: var(--text); }
+  .narr-heat { font-size: 11px; color: var(--accent); white-space: nowrap; }
+  .narr-move { font-size: 11.5px; color: var(--faint); margin-top: 3px; }
+  .narr-move.pos { color: var(--good); }
+  .narr-move.neg { color: #f85149; }
+  .feed-item .feed-meta button { font-size: 11.5px; padding: 3px 9px; }
+  #feed-social { position: sticky; top: 74px; }
+  @media (max-width: 860px) { #feed-social { position: static; } }
+  .feed-item a { color: var(--text); text-decoration: none; font-size: 13.5px; line-height: 1.45; }
+  .feed-item a:hover { color: var(--accent); }
+  .feed-meta { font-size: 11.5px; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .trend-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13.5px; }
+  .trend-row + .trend-row { border-top: 1px solid var(--line-soft); }
+  .trend-rank { color: var(--faint); font-size: 11px; min-width: 15px; text-align: right; }
+  .trend-row img { width: 20px; height: 20px; border-radius: 50%; }
+  .feed-err { color: var(--faint); font-size: 12.5px; padding: 6px 0; }
+
+  /* ---------- learn tab ---------- */
+
+  .learn { max-width: 760px; }
+  .learn section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+  }
+  .learn h2 { font-size: 15px; margin: 0 0 8px; }
+  .learn p, .learn li { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+  .learn p b, .learn li b { color: var(--text); }
+  .learn ul, .learn ol { padding-left: 20px; margin: 6px 0; }
+  .learn dl { margin: 0; }
+  .learn dt { font-weight: 600; font-size: 13.5px; margin-top: 10px; }
+  .learn dd { margin: 2px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+  /* expanded detail row */
+  tr.detail td { background: var(--panel-2); padding: 0; }
+  .detail-inner { padding: 14px 16px; display: grid; grid-template-columns: minmax(230px, 330px) 1fr; gap: 18px; animation: fadein 0.15s ease; }
+  @media (max-width: 760px) { .detail-inner { grid-template-columns: 1fr; } }
+  .detail-inner h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+
+  .meter { display: grid; grid-template-columns: 86px 1fr 34px; align-items: center; gap: 8px; margin: 5px 0; }
+  .m-label { font-size: 12.5px; color: var(--muted); }
+  .m-track { height: 7px; border-radius: 4px; background: var(--meter-track); overflow: hidden; }
+  .m-fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; transition: width 0.3s ease; }
+  .m-val { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .kv { display: grid; grid-template-columns: auto auto; gap: 3px 16px; font-size: 13px; width: fit-content; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  .detail-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); }
+
+  .verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  .verdict.HOLD { background: rgba(139,152,169,0.13); color: var(--muted); }
+  .verdict.TRIM { background: var(--warn-soft); color: var(--warn); }
+  .verdict.SELL { background: var(--serious-soft); color: var(--serious); }
+  .verdict.URGENT { background: var(--critical); color: #fff; }
+
+  .reasons { margin: 5px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; }
+  .reasons li { margin: 2px 0; }
+
+  .spark { display: block; }
+  .spark polyline { fill: none; stroke: var(--faint); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2; }
+
+  .empty { color: var(--muted); text-align: center; padding: 44px 20px; }
+  .empty .big { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+  .steps { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; width: 200px; text-align: left; font-size: 13px; color: var(--muted); }
+  .step b { display: block; color: var(--text); margin-bottom: 4px; }
+
+  /* skeleton shimmer */
+  .skel-row { height: 42px; border-bottom: 1px solid var(--line-soft); position: relative; overflow: hidden; }
+  .skel-row::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 1.1s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  .section-toggle { background: none; border: none; color: var(--muted); font-size: 13px; padding: 6px 0; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .section-toggle:hover { color: var(--text); }
+
+  /* ---------- dialogs ---------- */
+
+  /* Browsers without <dialog> support treat it as a plain div and would show
+     all three popups permanently. This hides them regardless of support, and
+     the .fallback path positions them when opened without showModal(). */
+  dialog:not([open]) { display: none; }
+  dialog.fallback[open] {
+    display: block;
+    position: fixed;
+    top: 8vh;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+  }
+
+  dialog {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+    width: min(480px, 92vw);
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog h2 { margin: 0 0 4px; font-size: 16px; }
+  dialog .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  dialog label { display: block; margin: 11px 0 4px; font-size: 12.5px; color: var(--muted); }
+  dialog input { width: 100%; }
+  .dlg-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .settings-grid .full { grid-column: 1 / -1; }
+  .settings-section { grid-column: 1 / -1; margin: 14px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--faint); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+
+  footer { color: var(--faint); font-size: 12px; max-width: 1180px; margin: 0 auto; padding: 0 22px 34px; }
+  kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- Visible until the app's JavaScript finishes starting. If the file is opened
+     in a preview (phone tap, QuickLook, mail attachment viewer) scripts never
+     run and this stays on screen with instructions instead of silent dead buttons. -->
+<div id="boot-check" style="margin:14px 22px; padding:14px 16px; background:#2a1215; border:1px solid #6b2b2b; border-radius:10px; color:#ffd9d9; font:14px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;">
+  <b>The app hasn't started — buttons won't work yet.</b>
+  <div style="margin-top:6px; color:#e8b9b9;">
+    This almost always means the file opened in a <b>preview</b>, not a real browser. In order:<br>
+    1. <b>On a computer:</b> right-click the file → Open With → Chrome, Edge, Safari, or Firefox.<br>
+    2. <b>On a phone or tablet:</b> tapping a file only previews it — previews can't run apps. Open this file on a computer instead.<br>
+    3. If you're already in a real browser and still see this box, the error below says why — send it to me and I'll fix it.
+  </div>
+  <div id="boot-error" style="margin-top:8px; color:#ff8f8f; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>
+</div>
+
+<header>
+  <div class="brand"><h1>Coin&nbsp;Finder</h1><span>meme screener · v3</span></div>
+  <div class="tabs" id="tabs">
+    <button data-view="find" class="active">Find</button>
+    <button data-view="watch">Watchlist<span class="badge" id="watch-count"></span></button>
+    <button data-view="positions">Positions<span class="badge" id="pos-count"></span></button>
+    <button data-view="feed">Feed</button>
+    <button data-view="learn">Learn</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="header-meta" id="scan-age"></span>
+  <button id="btn-settings" class="ghost small">Settings</button>
+  <button id="btn-scan" class="primary">Scan</button>
+</header>
+
+<main>
+  <section id="view-find" class="view active">
+    <div class="toolbar">
+      <input id="search" class="search" type="search" placeholder="Filter coins…  ( / )">
+      <button id="btn-lookup" class="ghost">Look up any coin</button>
+      <button id="btn-group" class="ghost small">Grouped by buy type</button>
+      <div class="chips" id="chain-chips"></div>
+      <div class="spacer"></div>
+      <label class="switch"><input type="checkbox" id="auto-scan">Auto-rescan 2&nbsp;min</label>
+    </div>
+    <div class="tiles" id="find-tiles" hidden></div>
+    <div id="find-status"></div>
+    <div id="find-picks"></div>
+    <div id="find-results"></div>
+    <div id="rejected-block"></div>
+  </section>
+
+  <section id="view-feed" class="view">
+    <div class="toolbar">
+      <button id="btn-feed-refresh" class="primary">Refresh feed</button>
+      <span class="header-meta" id="feed-updated"></span>
+      <div class="spacer"></div>
+      <span class="header-meta">Public feeds, read-only — nothing is posted anywhere.</span>
+    </div>
+    <div class="tiles" id="feed-tiles" hidden></div>
+    <div class="toolbar">
+      <input id="feed-search" class="search" type="search" placeholder="Search the feed…">
+      <select id="feed-sort" title="Sort the feed">
+        <option value="smart">Best first</option>
+        <option value="new">Newest first</option>
+        <option value="active">Most active</option>
+        <option value="movers">Biggest movers</option>
+      </select>
+      <label class="switch"><input type="checkbox" id="feed-auto">Auto 2&nbsp;min</label>
+      <div class="chips" id="feed-chips"></div>
+    </div>
+    <div id="feed-status"></div>
+    <div id="feed-narratives"></div>
+    <div class="feed-cols">
+      <div id="feed-stream"></div>
+      <div id="feed-social"></div>
+    </div>
+  </section>
+
+  <section id="view-learn" class="view">
+    <div id="learn-content" class="learn"></div>
+  </section>
+
+  <section id="view-watch" class="view">
+    <div class="toolbar">
+      <button id="btn-watch-refresh" class="primary">Refresh prices</button>
+      <span class="header-meta">Coins you starred — no money attached, just watching.</span>
+    </div>
+    <div id="watch-results"></div>
+  </section>
+
+  <section id="view-positions" class="view">
+    <div class="toolbar">
+      <button id="btn-check" class="primary">Check for sell signals</button>
+      <button id="btn-add-manual" class="ghost">Add by link</button>
+      <button id="btn-import" class="ghost small">Import</button>
+      <button id="btn-export" class="ghost small">Export</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <div class="spacer"></div>
+      <label class="switch"><input type="checkbox" id="auto-check">Auto-check 30&nbsp;s</label>
+      <label class="switch"><input type="checkbox" id="notify-toggle">Alert me</label>
+    </div>
+    <div class="tiles" id="pos-tiles" hidden></div>
+    <div id="pos-status"></div>
+    <div id="pos-results"></div>
+    <div id="pos-history" style="margin-top:16px"></div>
+  </section>
+</main>
+
+<footer>
+  This tool only suggests. It never places a trade, holds funds, or touches your wallet —
+  you make every buy and sell yourself in FOMO. Scores are heuristics, not predictions.
+  Shortcuts: <kbd>/</kbd> search · <kbd>1</kbd>–<kbd>5</kbd> tabs · <kbd>Esc</kbd> close.
+</footer>
+
+<div id="toasts"></div>
+
+<dialog id="dlg-buy">
+  <h2>Track this position</h2>
+  <p class="hint" id="buy-hint"></p>
+  <label for="buy-amount">How much did you put in? (USD)</label>
+  <input id="buy-amount" type="number" min="0" step="any" placeholder="250">
+  <p class="hint" id="buy-suggest" style="margin:8px 0 0"></p>
+  <label for="buy-price">Entry price (blank = current price)</label>
+  <input id="buy-price" type="number" min="0" step="any" placeholder="current">
+  <label for="buy-note">Note (optional)</label>
+  <input id="buy-note" type="text" placeholder="">
+  <div class="dlg-row">
+    <button data-close class="ghost">Cancel</button>
+    <button id="buy-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-manual">
+  <h2>Add a position</h2>
+  <p class="hint">Paste the DexScreener link for the coin you bought.</p>
+  <label for="man-link">DexScreener link</label>
+  <input id="man-link" type="text" placeholder="https://dexscreener.com/solana/…">
+  <label for="man-amount">How much did you put in? (USD)</label>
+  <input id="man-amount" type="number" min="0" step="any" placeholder="250">
+  <label for="man-price">Entry price (blank = current price)</label>
+  <input id="man-price" type="number" min="0" step="any" placeholder="current">
+  <div class="dlg-row">
+    <button data-close class="ghost">Cancel</button>
+    <button id="man-save" class="primary">Add</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-lookup">
+  <h2>Look up any coin</h2>
+  <p class="hint">Paste a contract address, a ticker, or a DexScreener link — straight from FOMO.
+     This searches every chain, not just your scan.</p>
+  <label for="lookup-q">Address, ticker, or link</label>
+  <input id="lookup-q" type="text" placeholder="e.g. BONK, or So11111…">
+  <div id="lookup-results" style="margin-top:14px; max-height:46vh; overflow-y:auto"></div>
+  <div class="dlg-row">
+    <button data-close class="ghost">Close</button>
+    <button id="lookup-go" class="primary">Search</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-explain">
+  <h2 id="explain-term"></h2>
+  <p class="hint" id="explain-text" style="margin-top:10px"></p>
+  <div class="dlg-row"><button data-close class="ghost">Close</button></div>
+</dialog>
+
+<dialog id="dlg-settings">
+  <h2>Settings</h2>
+  <p class="hint">Stored in this browser. Scan settings apply on the next scan.</p>
+  <div class="settings-grid">
+    <div class="settings-section">Discovery</div>
+    <div class="full">
+      <label for="set-chains">Chains (comma separated)</label>
+      <input id="set-chains" type="text">
+    </div>
+    <div class="full">
+      <label for="set-terms">Search terms (comma separated)</label>
+      <input id="set-terms" type="text">
+    </div>
+    <div class="settings-section">Buy filters</div>
+    <div><label for="set-minliq">Min liquidity ($)</label><input id="set-minliq" type="number" min="0" step="any"></div>
+    <div><label for="set-minvol">Min 24h volume ($)</label><input id="set-minvol" type="number" min="0" step="any"></div>
+    <div><label for="set-minage">Min age (minutes)</label><input id="set-minage" type="number" min="0" step="any"></div>
+    <div><label for="set-maxage">Max age (days)</label><input id="set-maxage" type="number" min="0" step="any"></div>
+    <div><label for="set-fdv">Max FDV ÷ liquidity</label><input id="set-fdv" type="number" min="0" step="any"></div>
+    <div><label for="set-buyratio">Min 1h buys (%)</label><input id="set-buyratio" type="number" min="0" max="100" step="any"></div>
+    <div class="settings-section">X (Twitter) feed — optional</div>
+    <div class="full">
+      <p class="hint" style="margin:2px 0 0">X has no free API and its embed widget no longer renders for
+      logged-out visitors, so nothing can read X for free. If you have access to any service that returns
+      tweets as JSON, paste its URL here and the Feed will pull real posts. Use <code>{query}</code> where the
+      search term goes. Your key is stored <b>only in this browser</b> — never in the site's code.</p>
+      <label for="set-xurl">Tweet source URL</label>
+      <input id="set-xurl" type="text" placeholder="https://api.example.com/search?q={query}">
+      <label for="set-xkey">Authorization header (optional)</label>
+      <input id="set-xkey" type="password" placeholder="Bearer xxxxxxxx">
+    </div>
+    <div class="settings-section">Position sizing (optional)</div>
+    <div><label for="set-bankroll">Bankroll ($)</label><input id="set-bankroll" type="number" min="0" step="any" placeholder="e.g. 1000"></div>
+    <div><label for="set-risk">Risk per trade (%)</label><input id="set-risk" type="number" min="0.1" max="100" step="any" placeholder="1"></div>
+    <div class="settings-section">Sell rules</div>
+    <div><label for="set-tp">Take profit (%)</label><input id="set-tp" type="number" step="any"></div>
+    <div><label for="set-sl">Stop loss (%)</label><input id="set-sl" type="number" step="any"></div>
+    <div><label for="set-trail">Trailing stop (%)</label><input id="set-trail" type="number" step="any"></div>
+    <div><label for="set-liqdrop">Liquidity drop alert (%)</label><input id="set-liqdrop" type="number" step="any"></div>
+  </div>
+  <div class="dlg-row">
+    <button id="set-reset" class="ghost">Reset to defaults</button>
+    <button data-close class="ghost">Cancel</button>
+    <button id="set-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ * Configuration
+ *
+ * Mirrors config/default.yaml from the Python version. Kept in one
+ * object so the scoring code below reads the same names as scoring.py.
+ * ------------------------------------------------------------------ */
+
+const DEFAULTS = {
+  discovery: {
+    // Chains FOMO trades on, plus the other chains meme coins launch on.
+    chains: ["solana", "base", "ethereum", "bsc", "monad", "arbitrum", "polygon",
+             "avalanche", "sui", "ton", "blast", "hyperliquid", "abstract", "tron"],
+    search_terms: ["pump", "meme", "dog", "cat", "pepe", "moon", "elon", "trump", "inu", "bonk"],
+    max_candidates: 600,
+  },
+  filters: {
+    min_liquidity_usd: 15000,
+    min_volume_h24_usd: 20000,
+    min_age_minutes: 30,
+    max_age_days: 45,
+    max_fdv_to_liquidity_ratio: 60,
+    min_buy_ratio_h1: 0.45,
+  },
+  scoring: {
+    weights: { liquidity: 15, turnover: 20, momentum: 25, buy_pressure: 20, age_fit: 10, safety: 10 },
+    liquidity_saturation_usd: 300000,
+    turnover_saturation_ratio: 4.0,
+    momentum_late_pump_threshold_pct: 150,
+    age_fit_sweet_spot_hours: [2, 240],
+  },
+  sell_rules: {
+    take_profit_pct: 60,
+    stop_loss_pct: -25,
+    trailing_stop_pct: -30,
+    liquidity_drop_pct: -40,
+    momentum_decay_volume_ratio: 0.15,
+    momentum_decay_min_hold_hours: 2,
+  },
+};
+
+const STORE_CONFIG = "coinfinder.config";
+const STORE_POSITIONS = "coinfinder.positions";
+
+/** localStorage can throw outright (private mode, blocked site data). */
+function readStore(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function writeStore(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function deepMerge(base, override) {
+  const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+  for (const [k, v] of Object.entries(override || {})) {
+    if (v && typeof v === "object" && !Array.isArray(v) && base[k] && typeof base[k] === "object") {
+      out[k] = deepMerge(base[k], v);
+    } else if (v !== undefined) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+let CONFIG = deepMerge(DEFAULTS, readStore(STORE_CONFIG, {}));
+
+/* ------------------------------------------------------------------ *
+ * Data provider (DexScreener)
+ * ------------------------------------------------------------------ */
+
+const API = "https://api.dexscreener.com";
+
+async function getJson(url) {
+  // One retry for transient failures, and a 12s timeout so a hung request
+  // can't leave a button stuck on "Scanning…" forever.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+      let res;
+      try {
+        res = await fetch(url, { headers: { Accept: "application/json" }, signal: ctrl ? ctrl.signal : undefined });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
+      return await res.json();
+    } catch (err) {
+      if (attempt === 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+  }
+}
+
+/** Endpoints return either a bare array or {pairs:[...]} — accept both. */
+function pairsFrom(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.pairs)) return payload.pairs;
+  if (payload && payload.pair) return [payload.pair];
+  return [];
+}
+
+async function fetchBoostedTokens() {
+  const out = [];
+  for (const path of ["/token-boosts/top/v1", "/token-boosts/latest/v1"]) {
+    try {
+      const payload = await getJson(API + path);
+      if (Array.isArray(payload)) out.push(...payload);
+    } catch (err) {
+      /* One feed failing shouldn't sink the whole scan. */
+    }
+  }
+  return out;
+}
+
+/* GeckoTerminal names some chains differently from DexScreener. Discovery
+   happens on GeckoTerminal (100+ chains, no key); scoring data always comes
+   back from DexScreener, so every candidate is measured the same way. */
+const GECKO_TO_DEX = {
+  "eth": "ethereum", "bsc": "bsc", "solana": "solana", "base": "base",
+  "monad": "monad", "polygon_pos": "polygon", "arbitrum": "arbitrum",
+  "avax": "avalanche", "ton": "ton", "sui-network": "sui", "blast": "blast",
+  "abstract": "abstract", "tron": "tron", "hyperevm": "hyperliquid",
+  "berachain": "berachain", "unichain": "unichain",
+};
+
+/** Pool addresses from GeckoTerminal's trending + brand-new feeds, all chains. */
+async function discoverPools(allowedChains) {
+  const pages = [
+    `${GECKO}/networks/trending_pools?page=1`,
+    `${GECKO}/networks/trending_pools?page=2`,
+    `${GECKO}/networks/new_pools?page=1`,
+    `${GECKO}/networks/new_pools?page=2`,
+  ];
+  const byChain = new Map();
+  const results = await Promise.all(pages.map((u) => getJson(u).catch(() => null)));
+  for (const payload of results) {
+    const rows = payload && Array.isArray(payload.data) ? payload.data : [];
+    for (const row of rows) {
+      const rawId = String(dig(row, "relationships", "network", "data", "id")
+        || String(row.id || "").split("_")[0] || "").toLowerCase();
+      const chain = GECKO_TO_DEX[rawId] || rawId;
+      if (!allowedChains.has(chain)) continue;
+      const address = String((row.attributes && row.attributes.address)
+        || String(row.id || "").split("_").slice(1).join("_") || "");
+      if (!address) continue;
+      if (!byChain.has(chain)) byChain.set(chain, new Set());
+      byChain.get(chain).add(address);
+    }
+  }
+  return byChain;
+}
+
+async function discover() {
+  const chains = new Set(CONFIG.discovery.chains.map((c) => String(c).toLowerCase()));
+  const byKey = new Map();
+  const boostByToken = new Map();
+
+  const boosted = await fetchBoostedTokens();
+  const grouped = new Map();
+  for (const entry of boosted) {
+    const chain = String(entry.chainId || "").toLowerCase();
+    const token = entry.tokenAddress;
+    if (!chains.has(chain) || !token) continue;
+    if (!grouped.has(chain)) grouped.set(chain, new Set());
+    grouped.get(chain).add(token);
+    boostByToken.set(token, Math.max(boostByToken.get(token) || 0, Number(entry.totalAmount) || 0));
+  }
+
+  // Each request catches its own failure so one bad feed can't sink the scan.
+  // But if EVERY request fails the cause is the connection, not the data — and
+  // that needs a different message, so failures are counted rather than hidden.
+  let failed = 0;
+  const attempt = (url) => getJson(url).catch(() => { failed++; return null; });
+
+  const requests = [];
+  for (const [chain, tokens] of grouped) {
+    // The batch endpoint takes up to 30 comma-separated addresses.
+    const list = [...tokens];
+    for (let i = 0; i < list.length; i += 30) {
+      requests.push(attempt(`${API}/tokens/v1/${chain}/${list.slice(i, i + 30).join(",")}`));
+    }
+  }
+  for (const term of CONFIG.discovery.search_terms) {
+    requests.push(attempt(`${API}/latest/dex/search?q=${encodeURIComponent(term)}`));
+  }
+
+  // The widest source: live pools from GeckoTerminal, resolved back through
+  // DexScreener so every candidate carries the same fields as the rest.
+  const poolsByChain = await discoverPools(chains).catch(() => new Map());
+  for (const [chain, addresses] of poolsByChain) {
+    const list = [...addresses];
+    for (let i = 0; i < list.length; i += 30) {
+      requests.push(attempt(`${API}/latest/dex/pairs/${chain}/${list.slice(i, i + 30).join(",")}`));
+    }
+  }
+
+  const results = await Promise.all(requests);
+  if (requests.length > 0 && failed === requests.length) {
+    throw new Error(`all ${failed} requests to the data provider failed`);
+  }
+
+  for (const payload of results) {
+    for (const pair of pairsFrom(payload)) {
+      const chain = String(pair.chainId || "").toLowerCase();
+      if (!chains.has(chain) || !pair.pairAddress) continue;
+      const key = chain + ":" + pair.pairAddress;
+      if (byKey.has(key)) continue;
+      const candidate = toCandidate(pair);
+      candidate.boost_amount = boostByToken.get(candidate.token_address) || 0;
+      byKey.set(key, candidate);
+    }
+  }
+
+  const all = [...byKey.values()];
+  all.sort((a, b) => b.volume_h24 - a.volume_h24);
+  return all.slice(0, CONFIG.discovery.max_candidates);
+}
+
+async function fetchPair(chain, pairAddress) {
+  try {
+    const payload = await getJson(`${API}/latest/dex/pairs/${chain}/${pairAddress}`);
+    const pairs = pairsFrom(payload);
+    return pairs.length ? toCandidate(pairs[0]) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Normalization — the JS twin of models.Candidate
+ * ------------------------------------------------------------------ */
+
+function num(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function dig(obj, ...keys) {
+  let cur = obj;
+  for (const k of keys) {
+    if (!cur || typeof cur !== "object") return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+
+function toCandidate(pair) {
+  const base = pair.baseToken || {};
+  const info = pair.info || {};
+  const c = {
+    chain: String(pair.chainId || "unknown"),
+    dex: String(pair.dexId || "unknown"),
+    pair_address: String(pair.pairAddress || ""),
+    token_address: String(base.address || ""),
+    symbol: String(base.symbol || "?"),
+    name: String(base.name || "?"),
+    url: String(pair.url || ""),
+    price_usd: num(pair.priceUsd),
+    liquidity_usd: num(dig(pair, "liquidity", "usd")),
+    fdv: num(pair.fdv),
+    volume_h24: num(dig(pair, "volume", "h24")),
+    volume_h1: num(dig(pair, "volume", "h1")),
+    price_change_h1: num(dig(pair, "priceChange", "h1")),
+    price_change_h6: num(dig(pair, "priceChange", "h6")),
+    price_change_h24: num(dig(pair, "priceChange", "h24")),
+    buys_h1: Math.trunc(num(dig(pair, "txns", "h1", "buys"))),
+    sells_h1: Math.trunc(num(dig(pair, "txns", "h1", "sells"))),
+    buys_h24: Math.trunc(num(dig(pair, "txns", "h24", "buys"))),
+    sells_h24: Math.trunc(num(dig(pair, "txns", "h24", "sells"))),
+    pair_created_at_ms: Math.trunc(num(pair.pairCreatedAt)),
+    socials: Array.isArray(info.socials) ? info.socials : [],
+    websites: Array.isArray(info.websites) ? info.websites : [],
+    boost_amount: 0,
+  };
+
+  c.age_minutes = c.pair_created_at_ms > 0 ? Math.max(0, (Date.now() - c.pair_created_at_ms) / 60000) : 0;
+  c.age_hours = c.age_minutes / 60;
+  const h1 = c.buys_h1 + c.sells_h1;
+  c.buy_ratio_h1 = h1 === 0 ? 0.5 : c.buys_h1 / h1;
+  c.turnover_ratio = c.liquidity_usd <= 0 ? 0 : c.volume_h24 / c.liquidity_usd;
+  c.fdv_to_liquidity = c.liquidity_usd <= 0 ? 0 : c.fdv / c.liquidity_usd;
+  return c;
+}
+
+/* ------------------------------------------------------------------ *
+ * Filters and scoring — the JS twin of scoring.py
+ * ------------------------------------------------------------------ */
+
+const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+const money = (n) => "$" + Math.round(n).toLocaleString();
+
+function applyFilters(c) {
+  const f = CONFIG.filters;
+  const reasons = [];
+
+  if (c.liquidity_usd < f.min_liquidity_usd)
+    reasons.push(`liquidity ${money(c.liquidity_usd)} < ${money(f.min_liquidity_usd)}`);
+  if (c.volume_h24 < f.min_volume_h24_usd)
+    reasons.push(`24h volume ${money(c.volume_h24)} < ${money(f.min_volume_h24_usd)}`);
+
+  // Age 0 means the provider omitted pairCreatedAt: unknown, not brand new.
+  if (c.pair_created_at_ms > 0) {
+    if (c.age_minutes < f.min_age_minutes)
+      reasons.push(`age ${c.age_minutes.toFixed(0)}m < ${f.min_age_minutes}m`);
+    if (c.age_hours > f.max_age_days * 24)
+      reasons.push(`age ${(c.age_hours / 24).toFixed(1)}d > ${f.max_age_days}d`);
+  }
+
+  if (f.max_fdv_to_liquidity_ratio > 0 && c.fdv > 0 && c.fdv_to_liquidity > f.max_fdv_to_liquidity_ratio)
+    reasons.push(`FDV/liquidity ${c.fdv_to_liquidity.toFixed(0)}x > ${f.max_fdv_to_liquidity_ratio}x`);
+
+  if (c.buys_h1 + c.sells_h1 > 0 && c.buy_ratio_h1 < f.min_buy_ratio_h1)
+    reasons.push(`1h buy ratio ${(c.buy_ratio_h1 * 100).toFixed(0)}% < ${(f.min_buy_ratio_h1 * 100).toFixed(0)}%`);
+
+  return reasons;
+}
+
+function safetyComponent(c) {
+  let score = 1.0;
+  const flags = [];
+  const maxRatio = CONFIG.filters.max_fdv_to_liquidity_ratio;
+
+  if (c.fdv > 0 && maxRatio > 0) {
+    const overhang = c.fdv_to_liquidity / maxRatio;
+    if (overhang > 0.5) {
+      score -= clamp((overhang - 0.5) / 0.5) * 0.35;
+      flags.push(`FDV ${c.fdv_to_liquidity.toFixed(0)}x liquidity`);
+    }
+  }
+  if (c.socials.length === 0 && c.websites.length === 0) {
+    score -= 0.25;
+    flags.push("no socials/website");
+  }
+  if (c.liquidity_usd < 30000) {
+    score -= 0.20;
+    flags.push("thin liquidity");
+  }
+  const h24 = c.buys_h24 + c.sells_h24;
+  if (h24 >= 50 && c.buys_h24 / h24 < 0.45) {
+    score -= 0.20;
+    flags.push("24h net selling");
+  }
+  if (c.volume_h1 > 0 && c.volume_h24 > 0 && c.volume_h1 < (c.volume_h24 / 24) * 0.25) {
+    score -= 0.15;
+    flags.push("volume fading");
+  }
+  return [clamp(score), flags];
+}
+
+function scoreCandidate(c) {
+  const s = CONFIG.scoring;
+
+  const liquidity = s.liquidity_saturation_usd <= 0
+    ? 0
+    : clamp(Math.sqrt(c.liquidity_usd / s.liquidity_saturation_usd));
+
+  const turnover = s.turnover_saturation_ratio <= 0
+    ? 0
+    : clamp(c.turnover_ratio / s.turnover_saturation_ratio);
+
+  const late = s.momentum_late_pump_threshold_pct;
+  const blended = 0.6 * c.price_change_h1 + 0.4 * c.price_change_h6;
+  let momentum;
+  if (late <= 0) momentum = 0;
+  else if (blended <= -50) momentum = 0;
+  else if (blended < 0) momentum = 0.2 * (1 + blended / 50);
+  else if (blended <= late) momentum = 0.2 + 0.8 * (blended / late);
+  else momentum = Math.max(0.25, 1.0 - (blended - late) / (late * 3));
+
+  const totalH1 = c.buys_h1 + c.sells_h1;
+  const buy_pressure = totalH1 === 0
+    ? 0
+    : clamp((c.buy_ratio_h1 - 0.35) / 0.40) * clamp(totalH1 / 50);
+
+  const [lo, hi] = s.age_fit_sweet_spot_hours.map(Number);
+  let age_fit;
+  if (c.pair_created_at_ms <= 0) age_fit = 0.5;
+  else if (c.age_hours >= lo && c.age_hours <= hi) age_fit = 1.0;
+  else if (c.age_hours < lo) age_fit = clamp(c.age_hours / lo) * 0.7;
+  else age_fit = Math.max(0, 1.0 - (c.age_hours - hi) / (hi * 2));
+
+  const [safety, safetyFlags] = safetyComponent(c);
+
+  const components = { liquidity, turnover, momentum, buy_pressure, age_fit, safety };
+  const weights = CONFIG.scoring.weights;
+  const totalWeight = Object.values(weights).reduce((a, b) => a + Number(b), 0);
+  const weighted = Object.entries(components)
+    .reduce((sum, [name, value]) => sum + value * Number(weights[name] || 0), 0);
+
+  c.score = totalWeight > 0 ? Math.round((100 * weighted / totalWeight) * 10) / 10 : 0;
+  c.score_breakdown = components;
+
+  const flags = safetyFlags.slice();
+  if (c.price_change_h1 > late) flags.push(`already pumped ${c.price_change_h1.toFixed(0)}% in 1h`);
+  if (c.boost_amount > 0) flags.push(`paid boost ${c.boost_amount.toFixed(0)}`);
+  c.flags = flags;
+  return c;
+}
+
+function rank(candidates) {
+  const passing = [];
+  const rejected = [];
+  for (const c of candidates) {
+    const reasons = applyFilters(c);
+    if (reasons.length) {
+      c.reject_reasons = reasons;
+      rejected.push(c);
+    } else {
+      passing.push(scoreCandidate(c));
+    }
+  }
+  passing.sort((a, b) => b.score - a.score);
+  return { passing, rejected };
+}
+
+/* ------------------------------------------------------------------ *
+ * Sell rules — the JS twin of sell.py
+ * ------------------------------------------------------------------ */
+
+const SEVERITY = { HOLD: 0, TRIM: 1, SELL: 2, "URGENT SELL": 3 };
+
+function pctChange(current, reference) {
+  return reference <= 0 ? 0 : ((current - reference) / reference) * 100;
+}
+
+function evaluatePosition(position, current) {
+  if (!current || current.price_usd <= 0) {
+    return {
+      position,
+      verdict: "HOLD",
+      reasons: ["no live price available — could not evaluate, check manually"],
+      price_usd: 0, pnl_pct: 0, pnl_usd: 0,
+      drawdown_from_peak_pct: 0, liquidity_change_pct: 0, stale: true,
+    };
+  }
+
+  const r = CONFIG.sell_rules;
+  const price = current.price_usd;
+  const pnlPct = pctChange(price, position.entry_price_usd);
+  const pnlUsd = (position.amount_usd * pnlPct) / 100;
+  const peak = Math.max(position.peak_price_usd, price);
+  const drawdown = pctChange(price, peak);
+  const liquidityChange = pctChange(current.liquidity_usd, position.entry_liquidity_usd);
+  const holdHours = Math.max(0, (Date.now() / 1000 - position.opened_at) / 3600);
+
+  let verdict = "HOLD";
+  const reasons = [];
+  const escalate = (v, reason) => {
+    reasons.push(reason);
+    if (SEVERITY[v] > SEVERITY[verdict]) verdict = v;
+  };
+
+  if (position.entry_liquidity_usd > 0 && liquidityChange <= r.liquidity_drop_pct) {
+    escalate("URGENT SELL",
+      `liquidity down ${liquidityChange.toFixed(0)}% since entry ` +
+      `(${money(position.entry_liquidity_usd)} → ${money(current.liquidity_usd)}) — possible rug`);
+  }
+  if (pnlPct <= r.stop_loss_pct) {
+    escalate("SELL", `stop loss hit: ${pnlPct.toFixed(1)}% (limit ${r.stop_loss_pct}%)`);
+  }
+  if (pnlPct >= r.take_profit_pct) {
+    escalate("SELL", `take profit hit: +${pnlPct.toFixed(1)}% (target +${r.take_profit_pct}%)`);
+  }
+  if (drawdown <= r.trailing_stop_pct && price < peak) {
+    escalate("SELL", `trailing stop: down ${drawdown.toFixed(0)}% from peak (limit ${r.trailing_stop_pct}%)`);
+  }
+  if (holdHours >= r.momentum_decay_min_hold_hours && current.volume_h24 > 0) {
+    const hourly = current.volume_h24 / 24;
+    if (hourly > 0 && current.volume_h1 < hourly * r.momentum_decay_volume_ratio) {
+      escalate("TRIM",
+        `volume collapsing: 1h ${money(current.volume_h1)} vs ${money(hourly)}/h average — interest is gone`);
+    }
+  }
+  const totalH1 = current.buys_h1 + current.sells_h1;
+  if (totalH1 >= 20 && current.buy_ratio_h1 < 0.35) {
+    escalate("TRIM", `sellers taking over: only ${(current.buy_ratio_h1 * 100).toFixed(0)}% of 1h trades are buys`);
+  }
+
+  if (!reasons.length) reasons.push(`holding at ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%, no exit rule triggered`);
+
+  return {
+    position, verdict, reasons,
+    price_usd: price, pnl_pct: pnlPct, pnl_usd: pnlUsd,
+    drawdown_from_peak_pct: drawdown, liquidity_change_pct: liquidityChange,
+    stale: false, peak,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Positions storage
+ * ------------------------------------------------------------------ */
+
+function loadPositions() {
+  const raw = readStore(STORE_POSITIONS, {});
+  return raw && typeof raw === "object" ? raw : {};
+}
+
+function savePositions(positions) {
+  return writeStore(STORE_POSITIONS, positions);
+}
+
+const STORE_HISTORY = "coinfinder.history";
+
+function loadHistory() {
+  const raw = readStore(STORE_HISTORY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** Close a position into the trade journal, so wins and losses are recorded. */
+function closePosition(key, exitPrice) {
+  const positions = loadPositions();
+  const p = positions[key];
+  if (!p) return null;
+  const price = exitPrice > 0 ? exitPrice : 0;
+  const pnlPct = price > 0 ? pctChange(price, p.entry_price_usd) : 0;
+  const record = {
+    key, symbol: p.symbol, chain: p.chain, pair_address: p.pair_address,
+    entry_price_usd: p.entry_price_usd, exit_price_usd: price,
+    amount_usd: p.amount_usd, pnl_pct: pnlPct, pnl_usd: (p.amount_usd * pnlPct) / 100,
+    opened_at: p.opened_at, closed_at: Date.now() / 1000, note: p.note || "",
+  };
+  const history = loadHistory();
+  history.unshift(record);
+  writeStore(STORE_HISTORY, history.slice(0, 200));
+  delete positions[key];
+  savePositions(positions);
+  return record;
+}
+
+function addPosition(candidate, amountUsd, entryPrice, note) {
+  const positions = loadPositions();
+  const key = candidate.chain + ":" + candidate.pair_address;
+  const price = entryPrice > 0 ? entryPrice : candidate.price_usd;
+  positions[key] = {
+    key,
+    chain: candidate.chain,
+    pair_address: candidate.pair_address,
+    symbol: candidate.symbol,
+    entry_price_usd: price,
+    amount_usd: amountUsd,
+    entry_liquidity_usd: candidate.liquidity_usd,
+    opened_at: Date.now() / 1000,
+    peak_price_usd: price,
+    note: note || "",
+    history: [{ t: Date.now(), p: price }],
+  };
+  savePositions(positions);
+  return positions[key];
+}
+
+/* ------------------------------------------------------------------ *
+ * Rendering helpers
+ * ------------------------------------------------------------------ */
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+const STORE_WATCH = "coinfinder.watchlist";
+const STORE_LASTSCAN = "coinfinder.lastscan";
+const STORE_PREFS = "coinfinder.prefs";
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+function fmtPrice(p) {
+  if (!p) return "—";
+  if (p >= 1) return "$" + p.toFixed(4);
+  if (p >= 0.0001) return "$" + p.toFixed(6);
+  return "$" + p.toExponential(2);
+}
+
+function fmtCompact(n) {
+  if (!n) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1e9) return sign + "$" + (abs / 1e9).toFixed(1) + "B";
+  if (abs >= 1e6) return sign + "$" + (abs / 1e6).toFixed(1) + "M";
+  if (abs >= 1e3) return sign + "$" + (abs / 1e3).toFixed(1) + "K";
+  return sign + "$" + abs.toFixed(0);
+}
+
+function fmtAge(hours) {
+  if (!hours) return "?";
+  if (hours < 1) return Math.round(hours * 60) + "m";
+  if (hours < 48) return hours.toFixed(1) + "h";
+  return (hours / 24).toFixed(1) + "d";
+}
+
+function fmtPct(p, digits = 1) {
+  const cls = p >= 0 ? "pos" : "neg";
+  return `<span class="${cls}">${p >= 0 ? "+" : ""}${p.toFixed(digits)}%</span>`;
+}
+
+function relTime(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 50) return "just now";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  if (s < 86400) return (s / 3600).toFixed(1) + " h ago";
+  return Math.round(s / 86400) + " d ago";
+}
+
+function scoreClass(score) {
+  if (score >= 65) return "hi";
+  if (score >= 45) return "mid";
+  return "lo";
+}
+
+function toast(message, kind) {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.textContent = message;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, 3500);
+}
+
+function openUrl(url) {
+  if (!/^https:\/\//.test(url)) return;
+  try { window.open(url, "_blank", "noopener"); } catch (err) { location.href = url; }
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (err2) {
+      return false;
+    }
+  }
+}
+
+/** Trend sparkline: de-emphasis stroke, accent end dot with a surface ring. */
+function sparklineSvg(points, width = 92, height = 26) {
+  if (!points || points.length < 2) return "";
+  const last = points.slice(-24);
+  const values = last.map((pt) => pt.p);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pad = 4;
+  const coords = last.map((pt, i) => {
+    const x = pad + (i / (last.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((pt.p - min) / span) * (height - pad * 2);
+    return [x, y];
+  });
+  const pts = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const [ex, ey] = coords[coords.length - 1];
+  return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">
+    <polyline points="${pts}"></polyline>
+    <circle class="dot" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="3"></circle>
+  </svg>`;
+}
+
+function meterRow(label, value) {
+  const pct = Math.round(clamp(value) * 100);
+  return `<div class="meter">
+    <span class="m-label">${escapeHtml(label)}</span>
+    <div class="m-track"><div class="m-fill" style="width:${pct}%"></div></div>
+    <span class="m-val">${pct}</span>
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Glossary — every flag and reject reason, tap-to-explain
+ * ------------------------------------------------------------------ */
+
+const GLOSSARY = [
+  [/thin liquidity/i, "Thin liquidity",
+   "The pool backing this coin holds little money. Even a modest sell moves the price against you, and getting OUT of a big position may be impossible at anything near the shown price. Deeper pools = easier exits."],
+  [/no socials\/website/i, "No socials or website",
+   "The token lists no Twitter/Telegram/website. Serious projects almost always have at least one. Absence isn't proof of a scam, but anonymous tokens rug more often — treat it as a real warning."],
+  [/FDV .*liquidity|FDV\/liquidity/i, "FDV vs liquidity",
+   "FDV (fully diluted value) is what ALL tokens would be worth at this price. When FDV is huge compared to the pool's actual money, the price is propped up by very little — insiders can dump into that thin pool and crater it. Lower ratios are healthier."],
+  [/24h net selling/i, "Net selling",
+   "Over the last 24 hours more trades sold than bought. Someone is distributing. Momentum can still carry it, but you'd be buying what others are steadily exiting."],
+  [/volume fading/i, "Volume fading",
+   "The last hour's trading is far below the day's average — attention is leaving. Meme coins live on attention; when it fades, price usually follows."],
+  [/already pumped/i, "Already pumped",
+   "This coin already made a huge move in the last hour. Chasing a spike usually means buying near the top from people who bought earlier — the risk/reward has flipped against you."],
+  [/paid boost/i, "Paid boost",
+   "Someone PAID the listing site to promote this token. That's marketing, not organic interest. Sometimes it precedes real attention; often it decorates an exit."],
+  [/liquidity \$[\d,]+ </i, "Rejected: liquidity too low",
+   "The pool is below your minimum. You could get in, but getting out at a fair price would be hard. Raise or lower the bar in Settings."],
+  [/24h volume \$[\d,]+ </i, "Rejected: not enough trading",
+   "Too little was traded in 24 hours. Dead volume means wide spreads and no exit. Adjustable in Settings."],
+  [/age \d+m </i, "Rejected: too new",
+   "Minutes-old pairs are where most rugs happen — liquidity gets pulled before anyone can react. The minimum age filter dodges the most dangerous window."],
+  [/age [\d.]+d >/i, "Rejected: too old",
+   "Past your maximum age this isn't an early meme play anymore. The window where these coins make their fast moves has usually passed."],
+  [/buy ratio/i, "Rejected: sellers dominate",
+   "Fewer than your minimum share of recent trades were buys. You'd be catching what others are throwing."],
+];
+
+function explainTerm(text) {
+  for (const [re, term, explanation] of GLOSSARY) {
+    if (re.test(text)) {
+      $("#explain-term").textContent = term;
+      $("#explain-text").textContent = explanation;
+      openDialog($("#dlg-explain"));
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Capture phase so a flag tap explains itself instead of toggling the row. */
+document.addEventListener("click", (e) => {
+  const flag = e.target.closest(".flag");
+  if (flag && explainTerm(flag.textContent)) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+/* ------------------------------------------------------------------ *
+ * Plays — the same scored coins, grouped by what you'd actually DO
+ *
+ * A score answers "how good", not "good for what". A coin heating up
+ * right now and a coin worth sitting on are different trades with
+ * different hold times, so each play has its own gate and its own
+ * ranking, and every card says which number qualified it.
+ * ------------------------------------------------------------------ */
+
+/** 24h-average-relative volume in the last hour. >1 = heating up. */
+function velocity(c) {
+  const hourlyAverage = c.volume_h24 / 24;
+  return hourlyAverage > 0 ? c.volume_h1 / hourlyAverage : 0;
+}
+
+function notAlreadyPumped(c) {
+  return c.price_change_h1 <= CONFIG.scoring.momentum_late_pump_threshold_pct;
+}
+
+const PLAYS = [
+  {
+    id: "hour",
+    title: "Quick flips",
+    short: "Quick flip",
+    blurb: "In and out fast. Volume accelerating right now with buyers in control — the most profitable and the most fragile. Minutes to hours, and it needs watching.",
+    hold: "minutes–hours",
+    test: (c) => velocity(c) >= 1.25 && c.price_change_h1 > 2 && c.buy_ratio_h1 >= 0.52
+      && (c.buys_h1 + c.sells_h1) >= 20 && c.liquidity_usd >= 20000
+      && (c.score_breakdown.safety || 0) >= 0.45 && notAlreadyPumped(c),
+    rank: (c) => velocity(c) * (1 + c.price_change_h1 / 100),
+    why: (c) => [
+      `Trading ${velocity(c).toFixed(1)}× its normal hourly volume right now`,
+      `${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys (${c.buys_h1} vs ${c.sells_h1})`,
+      `Up ${c.price_change_h1.toFixed(0)}% in the last hour`,
+    ],
+  },
+  {
+    id: "climb",
+    title: "Swing trades",
+    short: "Swing",
+    blurb: "Ride a trend, not a candle. Up over 6h and 24h with no vertical spike — check it a few times a day. Hours to a few days.",
+    hold: "hours–days",
+    test: (c) => c.price_change_h6 > 0 && c.price_change_h24 > 0
+      && c.price_change_h1 > -8 && c.price_change_h1 < 80
+      && c.turnover_ratio >= 0.35 && c.liquidity_usd >= 30000
+      && (c.score_breakdown.safety || 0) >= 0.55 && c.age_hours >= 12,
+    rank: (c) => c.score,
+    why: (c) => [
+      `Up ${c.price_change_h6.toFixed(0)}% over 6h and ${c.price_change_h24.toFixed(0)}% over 24h`,
+      `No spike: ${c.price_change_h1 >= 0 ? "+" : ""}${c.price_change_h1.toFixed(0)}% in the last hour`,
+      `${c.turnover_ratio.toFixed(1)}× the pool traded in 24h`,
+    ],
+  },
+  {
+    id: "hold",
+    title: "Long holds",
+    short: "Hold",
+    blurb: "Buy and sit. Survived past the rug window with deep liquidity and a real presence — the only kind you can size up. Days to weeks.",
+    hold: "days–weeks",
+    test: (c) => c.age_hours >= 24 * 7 && c.liquidity_usd >= 100000
+      && (c.score_breakdown.safety || 0) >= 0.7 && c.turnover_ratio >= 0.3
+      && c.price_change_h24 > -20 && (c.socials.length + c.websites.length) > 0,
+    rank: (c) => c.liquidity_usd * (c.score_breakdown.safety || 0),
+    why: (c) => [
+      `${(c.age_hours / 24).toFixed(0)} days old — past the window where most rugs happen`,
+      `${fmtCompact(c.liquidity_usd)} liquidity, deep enough to exit a real position`,
+      `${c.socials.length + c.websites.length} public link${c.socials.length + c.websites.length === 1 ? "" : "s"}, still actively traded`,
+    ],
+  },
+  {
+    id: "fresh",
+    title: "Lottery tickets",
+    short: "Lottery",
+    blurb: "A bet, not a trade. Hours old with early traction: the biggest upside and by far the most likely to go to zero. Smallest size you can be bothered with.",
+    hold: "highest risk",
+    test: (c) => c.age_hours < 24 && c.age_hours > 0 && c.liquidity_usd >= 20000
+      && c.buy_ratio_h1 >= 0.55 && c.volume_h24 >= 20000 && (c.buys_h1 + c.sells_h1) >= 20,
+    rank: (c) => velocity(c),
+    why: (c) => [
+      `${fmtAge(c.age_hours)} old with ${fmtCompact(c.volume_h24)} already traded`,
+      `${(c.buy_ratio_h1 * 100).toFixed(0)}% of last-hour trades are buys`,
+      `${fmtCompact(c.liquidity_usd)} liquidity so far`,
+    ],
+  },
+];
+
+/* Every coin that passes the filters gets exactly one buy type — the first
+   play it qualifies for. Anything that fits no play is still tradeable, it
+   just has no obvious angle, so it's grouped honestly rather than hidden. */
+const PLAY_CARD_LIMIT = 6;
+
+const UNCLASSIFIED = {
+  id: "other",
+  title: "No clear angle",
+  short: "No angle",
+  hold: "your call",
+  blurb: "Passed every safety filter but doesn't fit a play — no strong momentum, no depth story, nothing urgent. Fine to ignore.",
+};
+
+function classify(c) {
+  for (const play of PLAYS) {
+    try {
+      if (play.test(c)) return play;
+    } catch (err) { /* a malformed candidate simply isn't classified */ }
+  }
+  return UNCLASSIFIED;
+}
+
+function playById(id) {
+  return PLAYS.find((p) => p.id === id) || UNCLASSIFIED;
+}
+
+function playCard(c, play) {
+  const key = candidateKey(c);
+  const tracked = !!loadPositions()[key];
+  const sl = CONFIG.sell_rules.stop_loss_pct;
+  const tp = CONFIG.sell_rules.take_profit_pct;
+  const stop = c.price_usd * (1 + sl / 100);
+  const target = c.price_usd * (1 + tp / 100);
+  const why = play.why(c).map((w) => `<li>${escapeHtml(w)}</li>`).join("");
+  const cautions = (c.flags || []).map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("");
+  return `<div class="pick">
+    <div class="p-top">
+      <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+      <span class="sym">${escapeHtml(c.symbol)}</span>
+      <span class="chain-tag">${escapeHtml(c.chain)}</span>
+      <span class="spacer"></span>
+      <span class="chain-tag" title="Age of the trading pair">${c.age_hours < 24 ? "🕐 " : ""}${fmtAge(c.age_hours)} old</span>
+      <span style="font-variant-numeric:tabular-nums">${fmtPrice(c.price_usd)}</span>
+    </div>
+    <ul class="why">${why}</ul>
+    ${cautions ? `<div>${cautions}</div>` : ""}
+    <div class="plan">Buying at ${fmtPrice(c.price_usd)}: stop <b>${fmtPrice(stop)}</b> (${sl}%),
+      target <b>${fmtPrice(target)}</b> (+${tp}%). Typical hold: <b>${escapeHtml(play.hold)}</b>.</div>
+    <div class="p-actions">
+      <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy for FOMO</button>
+      <button class="small primary" data-buy="${escapeHtml(key)}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
+      <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
+    </div>
+  </div>`;
+}
+
+function renderPicks() {
+  const target = $("#find-picks");
+  if (!state.scannedAt) { target.innerHTML = ""; return; }
+
+  const sections = PLAYS.map((play) => {
+    const all = state.passing
+      .filter((c) => classify(c).id === play.id)
+      .sort((a, b) => play.rank(b) - play.rank(a));
+    if (!all.length) return "";
+    const expanded = state.playExpanded[play.id];
+    const limit = expanded ? all.length : PLAY_CARD_LIMIT;
+    const shown = all.slice(0, limit);
+    const more = all.length - shown.length;
+    return `<div class="play">
+      <div class="picks-head">
+        <h2>${escapeHtml(play.title)}</h2>
+        <span>${escapeHtml(play.blurb)}</span>
+      </div>
+      <div class="picks">${shown.map((c) => playCard(c, play)).join("")}</div>
+      ${more > 0 || expanded ? `<button class="section-toggle" data-play-more="${play.id}">${
+        more > 0 ? `▸ Show ${more} more ${escapeHtml(play.title.toLowerCase())}` : "▾ Show fewer"}</button>` : ""}
+    </div>`;
+  }).filter(Boolean).join("");
+
+  target.innerHTML = sections || `<div class="picks-head"><h2>No plays this scan</h2>
+    <span>nothing clears the bar right now — most scans deserve zero buys, and that's the point</span></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * App state
+ * ------------------------------------------------------------------ */
+
+let PREFS = Object.assign({ autoScan: true, autoCheck: true, tab: "find", v: 2, bankroll: 0, risk_pct: 1, notify: false, feedAuto: false, feedSort: "smart", grouped: true, xUrl: "", xKey: "" }, readStore(STORE_PREFS, {}));
+// v2: auto-scan and auto-check became the default. Migrate older saved prefs up.
+if (PREFS.v !== 2) { PREFS.autoScan = true; PREFS.autoCheck = true; PREFS.v = 2; savePrefs(); }
+function savePrefs() { writeStore(STORE_PREFS, PREFS); }
+
+const state = {
+  passing: [],
+  lookupExtras: [],   // coins found via Look up, so buy/star can resolve them
+  rejected: [],
+  repricedAt: 0,
+  scannedAt: 0,
+  checkedCount: 0,
+  query: "",
+  chainFilter: new Set(),      // empty = all
+  sortKey: "score",
+  sortDir: -1,
+  expandedKey: null,
+  showRejected: false,
+  showHistory: false,
+  playExpanded: {},
+  alerted: {},
+  signals: null,
+  posExpandedKey: null,
+  scanning: false,
+  checking: false,
+};
+
+function loadWatchlist() {
+  const raw = readStore(STORE_WATCH, {});
+  return raw && typeof raw === "object" ? raw : {};
+}
+function saveWatchlist(w) { writeStore(STORE_WATCH, w); renderBadges(); }
+
+function candidateKey(c) { return c.chain + ":" + c.pair_address; }
+
+/* ------------------------------------------------------------------ *
+ * Find view
+ * ------------------------------------------------------------------ */
+
+const SORTS = {
+  score: (c) => c.score,
+  symbol: (c) => c.symbol.toLowerCase(),
+  price: (c) => c.price_usd,
+  h1: (c) => c.price_change_h1,
+  h6: (c) => c.price_change_h6,
+  h24: (c) => c.price_change_h24,
+  liq: (c) => c.liquidity_usd,
+  vol: (c) => c.volume_h24,
+  age: (c) => c.age_hours || Infinity,
+};
+
+const FIND_COLUMNS = [
+  ["score", "Score", "num"],
+  ["symbol", "Coin", ""],
+  ["price", "Price", "num"],
+  ["h1", "1h", "num"],
+  ["h6", "6h", "num"],
+  ["h24", "24h", "num"],
+  ["liq", "Liquidity", "num"],
+  ["vol", "24h Vol", "num"],
+  ["age", "Age", "num"],
+];
+
+function visibleResults() {
+  const q = state.query.trim().toLowerCase();
+  let rows = state.passing;
+  if (state.chainFilter.size) rows = rows.filter((c) => state.chainFilter.has(c.chain));
+  if (q) rows = rows.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+  const keyFn = SORTS[state.sortKey] || SORTS.score;
+  return rows.slice().sort((a, b) => {
+    const ka = keyFn(a), kb = keyFn(b);
+    return (ka < kb ? -1 : ka > kb ? 1 : 0) * state.sortDir;
+  });
+}
+
+function renderChainChips() {
+  const present = new Set(state.passing.map((c) => c.chain));
+  for (const chain of CONFIG.discovery.chains) present.add(String(chain).toLowerCase());
+  const html = [...present].sort().map((chain) => {
+    const on = state.chainFilter.size === 0 || state.chainFilter.has(chain);
+    return `<button class="chip ${on ? "on" : ""}" data-chain="${escapeHtml(chain)}">${escapeHtml(chain)}</button>`;
+  }).join("");
+  $("#chain-chips").innerHTML = html;
+}
+
+function renderFindTiles() {
+  const tiles = $("#find-tiles");
+  if (!state.scannedAt) { tiles.hidden = true; return; }
+  const top = state.passing[0];
+  tiles.hidden = false;
+  tiles.innerHTML = `
+    <div class="tile"><div class="t-label">Pairs checked</div><div class="t-value">${state.checkedCount}</div></div>
+    <div class="tile"><div class="t-label">Passed filters</div><div class="t-value">${state.passing.length}</div></div>
+    <div class="tile"><div class="t-label">Rejected</div><div class="t-value">${state.rejected.length}</div></div>
+    <div class="tile"><div class="t-label">Top score</div><div class="t-value">${top ? top.score.toFixed(0) + " · " + escapeHtml(top.symbol) : "—"}</div></div>`;
+}
+
+function watchStar(key) {
+  const watching = !!loadWatchlist()[key];
+  return `<button class="icon ${watching ? "on" : ""}" data-star="${escapeHtml(key)}" title="${watching ? "Remove from watchlist" : "Add to watchlist"}">${watching ? "★" : "☆"}</button>`;
+}
+
+function detailRowHtml(c, colspan) {
+  const b = c.score_breakdown || {};
+  const positions = loadPositions();
+  const tracked = !!positions[candidateKey(c)];
+  return `<tr class="detail"><td colspan="${colspan}"><div class="detail-inner">
+    <div>
+      <h4>Score breakdown</h4>
+      ${meterRow("Liquidity", b.liquidity || 0)}
+      ${meterRow("Turnover", b.turnover || 0)}
+      ${meterRow("Momentum", b.momentum || 0)}
+      ${meterRow("Buy pressure", b.buy_pressure || 0)}
+      ${meterRow("Age fit", b.age_fit || 0)}
+      ${meterRow("Safety", b.safety || 0)}
+    </div>
+    <div>
+      <h4>Details</h4>
+      <dl class="kv">
+        <dt>FDV</dt><dd>${fmtCompact(c.fdv)}</dd>
+        <dt>FDV ÷ liquidity</dt><dd>${c.fdv_to_liquidity ? c.fdv_to_liquidity.toFixed(1) + "×" : "—"}</dd>
+        <dt>1h trades</dt><dd>${c.buys_h1} buys / ${c.sells_h1} sells</dd>
+        <dt>24h trades</dt><dd>${c.buys_h24} buys / ${c.sells_h24} sells</dd>
+        <dt>Turnover</dt><dd>${c.turnover_ratio.toFixed(2)}× pool / 24h</dd>
+        <dt>Links</dt><dd>${c.socials.length + c.websites.length ? `${c.socials.length} social · ${c.websites.length} site` : "none listed"}</dd>
+        <dt>DEX</dt><dd>${escapeHtml(c.dex)}</dd>
+      </dl>
+      ${c.flags && c.flags.length ? `<div style="margin-top:8px">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
+    </div>
+    <div class="detail-actions">
+      <button class="small primary" data-buy="${escapeHtml(candidateKey(c))}" ${tracked ? "disabled" : ""}>${tracked ? "Tracked ✓" : "I bought this"}</button>
+      <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy token address</button>
+      <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Open DexScreener ↗</button>
+    </div>
+  </div></td></tr>`;
+}
+
+function renderResults() {
+  renderChainChips();
+  renderFindTiles();
+  renderPicks();
+  const target = $("#find-results");
+
+  if (!state.scannedAt) {
+    target.innerHTML = `<div class="empty">
+      <div class="big">Find meme coins worth a look</div>
+      Press <b>Scan</b> to pull live pair data, filter out the untradeable, and rank the rest.
+      <div class="steps">
+        <div class="step"><b>1 · Scan</b>Live pairs are filtered by liquidity, volume, age and buy pressure, then scored 0–100.</div>
+        <div class="step"><b>2 · Inspect</b>Click a row to see exactly why it scored what it did — six components, no black box.</div>
+        <div class="step"><b>3 · Track</b>Buy in FOMO, press “I bought this”, and the Positions tab watches for exit signals.</div>
+      </div>
+    </div>`;
+    $("#rejected-block").innerHTML = "";
+    return;
+  }
+
+  const rows = visibleResults();
+  if (!rows.length) {
+    const why = state.passing.length
+      ? "No coins match the current search / chain filter."
+      : "Nothing passed the filters this scan. Try loosening thresholds in Settings.";
+    target.innerHTML = `<div class="empty">${why}</div>`;
+  } else {
+    const colspan = FIND_COLUMNS.length + 1;
+    const head = FIND_COLUMNS.map(([key, label, cls]) => {
+      const sorted = state.sortKey === key;
+      const arrow = sorted ? (state.sortDir === -1 ? "▼" : "▲") : "▼";
+      return `<th class="sortable ${sorted ? "sorted" : ""}" data-sort="${key}" style="${cls === "num" ? "text-align:right" : ""}">${label}<span class="arrow">${arrow}</span></th>`;
+    }).join("") + "<th></th>";
+
+    const rowHtml = (c) => {
+      const key = candidateKey(c);
+      const expanded = state.expandedKey === key;
+      return `<tr class="row" data-key="${escapeHtml(key)}">
+        <td class="num"><span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span></td>
+        <td><div class="sym">${escapeHtml(c.symbol)}<span class="name">${escapeHtml(c.name)}</span></div>
+            <span class="chain-tag">${escapeHtml(c.chain)}</span>
+            ${PREFS.grouped ? "" : `<span class="type-badge t-${classify(c).id}">${escapeHtml(classify(c).short)}</span>`}</td>
+        <td class="num">${fmtPrice(c.price_usd)}</td>
+        <td class="num">${fmtPct(c.price_change_h1)}</td>
+        <td class="num">${fmtPct(c.price_change_h6)}</td>
+        <td class="num">${fmtPct(c.price_change_h24)}</td>
+        <td class="num">${fmtCompact(c.liquidity_usd)}</td>
+        <td class="num">${fmtCompact(c.volume_h24)}</td>
+        <td class="num">${fmtAge(c.age_hours)}</td>
+        <td>${watchStar(key)}</td>
+      </tr>${expanded ? detailRowHtml(c, colspan) : ""}`;
+    };
+
+    let body;
+    if (PREFS.grouped) {
+      // One table, group header rows — keeps every column aligned across groups.
+      const order = PLAYS.map((p) => p.id).concat(UNCLASSIFIED.id);
+      const buckets = new Map(order.map((id) => [id, []]));
+      for (const c of rows) buckets.get(classify(c).id).push(c);
+      body = order.map((id) => {
+        const group = buckets.get(id);
+        if (!group.length) return "";
+        const play = playById(id);
+        return `<tr class="group-row"><td colspan="${colspan}">
+            <span class="g-title">${escapeHtml(play.title)}</span>
+            <span class="g-sub">${group.length} coin${group.length === 1 ? "" : "s"} · ${escapeHtml(play.hold)}</span>
+            <span class="g-blurb">${escapeHtml(play.blurb)}</span>
+          </td></tr>` + group.map(rowHtml).join("");
+      }).join("");
+    } else {
+      body = rows.map(rowHtml).join("");
+    }
+
+    target.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  renderRejected();
+  renderScanAge();
+}
+
+function renderRejected() {
+  const block = $("#rejected-block");
+  if (!state.rejected.length) { block.innerHTML = ""; return; }
+  const rows = state.showRejected
+    ? state.rejected.slice(0, 40).map((c) => `
+        <tr><td><div class="sym">${escapeHtml(c.symbol)}</div><span class="chain-tag">${escapeHtml(c.chain)}</span></td>
+        <td class="num">${fmtCompact(c.volume_h24)}</td>
+        <td>${(c.reject_reasons || []).map((r) => `<span class="flag">${escapeHtml(r)}</span>`).join("")}</td></tr>`).join("")
+    : "";
+  block.innerHTML = `
+    <button class="section-toggle" id="toggle-rejected">${state.showRejected ? "▾" : "▸"} Rejected by filters (${state.rejected.length})</button>
+    ${state.showRejected ? `<div class="table-wrap"><table style="min-width:640px">
+      <thead><tr><th>Coin</th><th style="text-align:right">24h Vol</th><th>Why it was rejected</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : ""}`;
+}
+
+function renderScanAge() {
+  let text = state.scannedAt ? "Scanned " + relTime(state.scannedAt) : "";
+  if (state.scanning) text = "Scanning…";
+  else if (state.repricedAt && Date.now() - state.repricedAt < 60000)
+    text = "Prices live · " + relTime(state.repricedAt);
+  else if (PREFS.autoScan && nextScanAt) {
+    const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+    text += (text ? " · " : "") + "next scan " + (s >= 90 ? Math.round(s / 60) + "m" : s + "s");
+  }
+  $("#scan-age").textContent = text;
+}
+
+/* ------------------------------------------------------------------ *
+ * Positions view
+ * ------------------------------------------------------------------ */
+
+function renderPosTiles(signals) {
+  const tiles = $("#pos-tiles");
+  const live = signals.filter((s) => !s.stale);
+  if (!signals.length) { tiles.hidden = true; return; }
+  const invested = signals.reduce((sum, s) => sum + s.position.amount_usd, 0);
+  const pnl = live.reduce((sum, s) => sum + s.pnl_usd, 0);
+  const value = invested + pnl;
+  const actionable = signals.filter((s) => s.verdict !== "HOLD").length;
+  const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+  tiles.hidden = false;
+  tiles.innerHTML = `
+    <div class="tile"><div class="t-label">Invested</div><div class="t-value">${fmtCompact(invested)}</div></div>
+    <div class="tile"><div class="t-label">Value now</div><div class="t-value">${fmtCompact(value)}</div>
+      <div class="t-delta ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "▲" : "▼"} ${fmtCompact(Math.abs(pnl))} (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)</div></div>
+    <div class="tile"><div class="t-label">Positions</div><div class="t-value">${signals.length}</div></div>
+    <div class="tile"><div class="t-label">Exit signals</div><div class="t-value">${actionable}</div></div>`;
+}
+
+/* ---- post-buy plan: what to actually do, in prices not adjectives ---- */
+
+/** The exits that bind right now, as real prices with distances. */
+function exitLevels(s) {
+  const p = s.position;
+  const r = CONFIG.sell_rules;
+  const peak = Math.max(p.peak_price_usd || 0, s.price_usd || 0);
+  const target = p.entry_price_usd * (1 + r.take_profit_pct / 100);
+  const hardStop = p.entry_price_usd * (1 + r.stop_loss_pct / 100);
+  const trailStop = peak * (1 + r.trailing_stop_pct / 100);
+  // Once you're up, the trailing stop usually sits ABOVE the original stop —
+  // that higher one is the level that actually protects the position.
+  const floor = Math.max(hardStop, trailStop);
+  const away = (level) => s.price_usd > 0 ? ((level - s.price_usd) / s.price_usd) * 100 : 0;
+  return {
+    peak, target, hardStop, trailStop, floor,
+    toTarget: away(target), toFloor: away(floor),
+    floorIsTrailing: trailStop > hardStop,
+    lockedIn: ((floor - p.entry_price_usd) / p.entry_price_usd) * 100,
+  };
+}
+
+/** One concrete instruction, chosen by verdict and how the trade is doing. */
+function planHeadline(s, levels) {
+  const pnl = s.pnl_pct;
+  if (s.stale) return ["Can't price it right now", "No live data came back. Check the coin in FOMO directly before doing anything — don't assume this is fine."];
+  if (s.verdict === "URGENT SELL") return ["Exit now", "The pool is draining. Exit while a fill is still possible — the price you see may not be the price you get."];
+  if (s.verdict === "SELL") return ["Sell — a rule you set has fired", "You wrote this rule when you were calm. Follow it now, while you aren't."];
+  if (s.verdict === "TRIM") return ["Take some off", "Interest is fading. Selling part locks in progress and leaves a smaller position running."];
+  if (pnl <= -15) return ["Hold to the stop — do not add", `Down ${pnl.toFixed(0)}%. Averaging down turns one bad trade into a bigger one. Your stop is ${fmtPrice(levels.floor)}.`];
+  if (pnl < 0) return ["Nothing to do yet", `Down ${Math.abs(pnl).toFixed(1)}% and inside normal noise. The stop at ${fmtPrice(levels.floor)} is the plan.`];
+  if (pnl >= CONFIG.sell_rules.take_profit_pct) return ["Target reached — take profit", "This is exactly what you were waiting for. Sell, or sell most and let a small piece run."];
+  if (pnl >= 25) return ["Consider taking half off", `Up ${pnl.toFixed(0)}%. Selling half and treating ${fmtPrice(s.position.entry_price_usd)} as your floor makes the rest a free roll.`];
+  if (pnl >= 8) return ["Let it work", `Up ${pnl.toFixed(0)}%. Nothing to do until either ${fmtPrice(levels.target)} or ${fmtPrice(levels.floor)}.`];
+  return ["Let it work", `Flat so far. The trade needs room — nothing to do until ${fmtPrice(levels.target)} or ${fmtPrice(levels.floor)}.`];
+}
+
+/** The compact version for the row: the two numbers that matter. */
+function nextTriggers(s) {
+  if (s.stale) return "";
+  const l = exitLevels(s);
+  return `<div class="feed-meta" style="margin-top:4px">
+    <span>${l.toTarget > 0 ? `+${l.toTarget.toFixed(0)}% to target` : "target reached"}</span>
+    <span>${l.toFloor < 0 ? `${Math.abs(l.toFloor).toFixed(0)}% above ${l.floorIsTrailing ? "trailing stop" : "stop"}` : "at/below stop"}</span>
+  </div>`;
+}
+
+function planHtml(s) {
+  const p = s.position;
+  const l = exitLevels(s);
+  const [headline, detail] = planHeadline(s, l);
+  const riskUsd = p.amount_usd * Math.abs(CONFIG.sell_rules.stop_loss_pct) / 100;
+  const targetUsd = p.amount_usd * CONFIG.sell_rules.take_profit_pct / 100;
+  const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
+
+  const rows = s.stale ? "" : `
+    <dl class="kv">
+      <dt>Take profit at</dt><dd>${fmtPrice(l.target)} <span style="color:var(--faint)">${l.toTarget > 0 ? `+${l.toTarget.toFixed(1)}% away` : "reached"}</span></dd>
+      <dt>${l.floorIsTrailing ? "Trailing stop" : "Stop loss"} at</dt><dd>${fmtPrice(l.floor)} <span style="color:var(--faint)">${l.toFloor < 0 ? `${Math.abs(l.toFloor).toFixed(1)}% below` : "triggered"}</span></dd>
+      ${l.floorIsTrailing ? `<dt>Locked in</dt><dd class="${l.lockedIn >= 0 ? "pos" : "neg"}">${l.lockedIn >= 0 ? "+" : ""}${l.lockedIn.toFixed(1)}% vs entry</dd>` : ""}
+      <dt>Risk if stopped</dt><dd class="neg">−$${riskUsd.toFixed(2)}</dd>
+      <dt>Gain if target hits</dt><dd class="pos">+$${targetUsd.toFixed(2)}</dd>
+      <dt>Exit still open?</dt><dd>${fmtCompact(p.entry_liquidity_usd)} → ${s.liquidity_change_pct ? fmtPct(s.liquidity_change_pct) : "—"} liquidity since entry</dd>
+      <dt>Held</dt><dd>${fmtAge(holdHours)}</dd>
+    </dl>`;
+
+  return `<div>
+    <h4>What to do now</h4>
+    <div class="plan" style="margin-top:0">
+      <b>${escapeHtml(headline)}</b><br>${escapeHtml(detail)}
+    </div>
+    ${rows}
+    <div class="feed-err" style="padding-top:6px">Swapping in and out of a meme coin usually costs a few
+      percent in fees and slippage, so a trade needs to clear that before it's really green.</div>
+  </div>`;
+}
+
+/** Where the price sits between your stop and your take-profit. */
+function progressRail(s) {
+  if (s.stale || !s.price_usd) return "";
+  const sl = CONFIG.sell_rules.stop_loss_pct;
+  const tp = CONFIG.sell_rules.take_profit_pct;
+  const span = tp - sl;
+  if (!(span > 0)) return "";
+  const pos = clamp((s.pnl_pct - sl) / span) * 100;
+  return `<div class="rail">
+    <div class="rail-track"><div class="rail-mark" style="left:calc(${pos.toFixed(1)}% - 1.5px)"></div></div>
+    <div class="rail-legend"><span>stop ${sl}%</span><span>${s.pnl_pct >= 0 ? "+" : ""}${s.pnl_pct.toFixed(1)}%</span><span>+${tp}%</span></div>
+  </div>`;
+}
+
+function posDetailHtml(s, colspan) {
+  const p = s.position;
+  const holdHours = Math.max(0, (Date.now() / 1000 - p.opened_at) / 3600);
+  return `<tr class="detail"><td colspan="${colspan}"><div class="detail-inner">
+    ${planHtml(s)}
+    <div>
+      <h4>Position</h4>
+      <dl class="kv">
+        <dt>Opened</dt><dd>${new Date(p.opened_at * 1000).toLocaleString()} (${fmtAge(holdHours)} ago)</dd>
+        <dt>Size</dt><dd>${fmtCompact(p.amount_usd)}</dd>
+        <dt>Entry</dt><dd>${fmtPrice(p.entry_price_usd)}</dd>
+        <dt>Peak price</dt><dd>${fmtPrice(Math.max(p.peak_price_usd, s.price_usd || 0))}</dd>
+        <dt>From peak</dt><dd>${s.stale ? "—" : fmtPct(s.drawdown_from_peak_pct)}</dd>
+        <dt>Pair</dt><dd style="font-size:11.5px">${escapeHtml(p.pair_address.slice(0, 18))}…</dd>
+      </dl>
+      <h4 style="margin-top:12px">Note</h4>
+      <div style="display:flex; gap:8px;">
+        <input id="note-input" type="text" value="${escapeHtml(p.note || "")}" placeholder="Why did you buy?">
+        <button class="small" data-save-note="${escapeHtml(p.key)}">Save</button>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="small" data-copy="${escapeHtml(p.pair_address)}">Copy pair address</button>
+      <button class="small ghost" data-open-url="https://dexscreener.com/${escapeHtml(p.chain)}/${escapeHtml(p.pair_address)}">Open DexScreener ↗</button>
+      <button class="small" data-sold="${escapeHtml(p.key)}">Sold it — log the result</button>
+      <button class="small ghost" data-remove="${escapeHtml(p.key)}" style="color:#f85149">Stop tracking</button>
+    </div>
+  </div></td></tr>`;
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  const block = $("#pos-history");
+  if (!history.length) { block.innerHTML = ""; return; }
+
+  const wins = history.filter((h) => h.pnl_usd > 0).length;
+  const total = history.reduce((sum, h) => sum + h.pnl_usd, 0);
+  const rows = state.showHistory ? history.slice(0, 25).map((h) => `
+    <tr>
+      <td><div class="sym">${escapeHtml(h.symbol)}</div><span class="chain-tag">${escapeHtml(h.chain)}</span></td>
+      <td class="num">${fmtPrice(h.entry_price_usd)}</td>
+      <td class="num">${fmtPrice(h.exit_price_usd)}</td>
+      <td class="num">${fmtPct(h.pnl_pct)}</td>
+      <td class="num"><span class="${h.pnl_usd >= 0 ? "pos" : "neg"}">${h.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(h.pnl_usd).toFixed(2)}</span></td>
+      <td class="num">${fmtAge(Math.max(0, (h.closed_at - h.opened_at) / 3600))}</td>
+      <td class="num" style="color:var(--faint)">${relTime(h.closed_at * 1000)}</td>
+    </tr>`).join("") : "";
+
+  block.innerHTML = `
+    <button class="section-toggle" id="toggle-history">${state.showHistory ? "▾" : "▸"}
+      Closed trades (${history.length}) · ${wins}W–${history.length - wins}L ·
+      <span class="${total >= 0 ? "pos" : "neg"}">${total >= 0 ? "+" : "−"}$${Math.abs(total).toFixed(2)} realized</span>
+    </button>
+    ${state.showHistory ? `<div class="table-wrap"><table style="min-width:640px">
+      <thead><tr><th>Coin</th><th style="text-align:right">Entry</th><th style="text-align:right">Exit</th>
+      <th style="text-align:right">P&amp;L</th><th style="text-align:right">P&amp;L $</th>
+      <th style="text-align:right">Held</th><th style="text-align:right">Closed</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : ""}`;
+}
+
+function renderSignals() {
+  renderHistory();
+  const target = $("#pos-results");
+  const signals = state.signals;
+
+  if (!signals || !signals.length) {
+    const n = Object.keys(loadPositions()).length;
+    renderPosTiles([]);
+    target.innerHTML = n
+      ? `<div class="empty"><div class="big">${n} position${n === 1 ? "" : "s"} tracked</div>Press <b>Check for sell signals</b> to price them and evaluate the exit rules.</div>`
+      : `<div class="empty"><div class="big">No positions yet</div>Scan for coins, buy one in FOMO, then press “I bought this” — exit rules watch it here.</div>`;
+    return;
+  }
+
+  renderPosTiles(signals);
+  const order = { "URGENT SELL": 0, SELL: 1, TRIM: 2, HOLD: 3 };
+  const sorted = signals.slice().sort((a, b) => order[a.verdict] - order[b.verdict]);
+  const colspan = 8;
+
+  const rows = sorted.map((s) => {
+    const p = s.position;
+    const cls = s.verdict === "URGENT SELL" ? "URGENT" : s.verdict;
+    const expanded = state.posExpandedKey === p.key;
+    return `<tr class="row" data-poskey="${escapeHtml(p.key)}">
+      <td><span class="verdict ${cls}">${s.verdict}</span></td>
+      <td><div class="sym">${escapeHtml(p.symbol)}</div><span class="chain-tag">${escapeHtml(p.chain)}</span>
+          <ul class="reasons">${s.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+          ${nextTriggers(s)}</td>
+      <td style="min-width:150px">${sparklineSvg(p.history)}${progressRail(s)}</td>
+      <td class="num">${fmtPrice(p.entry_price_usd)}</td>
+      <td class="num">${fmtPrice(s.price_usd)}</td>
+      <td class="num">${s.stale ? "—" : fmtPct(s.pnl_pct)}</td>
+      <td class="num">${s.stale ? "—" : `<span class="${s.pnl_usd >= 0 ? "pos" : "neg"}">${s.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(s.pnl_usd).toFixed(2)}</span>`}</td>
+      <td class="num">${fmtCompact(p.amount_usd)}</td>
+    </tr>${expanded ? posDetailHtml(s, colspan) : ""}`;
+  }).join("");
+
+  target.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Verdict</th><th>Coin &amp; why</th><th>Trend</th>
+      <th style="text-align:right">Entry</th><th style="text-align:right">Now</th>
+      <th style="text-align:right">P&amp;L</th><th style="text-align:right">P&amp;L $</th>
+      <th style="text-align:right">Size</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Watchlist view
+ * ------------------------------------------------------------------ */
+
+function renderWatchlist(priced) {
+  const target = $("#watch-results");
+  const watch = loadWatchlist();
+  const keys = Object.keys(watch);
+  if (!keys.length) {
+    target.innerHTML = `<div class="empty"><div class="big">Watchlist is empty</div>Star ☆ a coin in the Find tab to keep an eye on it without buying.</div>`;
+    return;
+  }
+  const rows = keys.map((key) => {
+    const w = watch[key];
+    const c = priced && priced[key];
+    return `<tr class="row" data-watchkey="${escapeHtml(key)}">
+      <td><div class="sym">${escapeHtml(w.symbol)}</div><span class="chain-tag">${escapeHtml(w.chain)}</span></td>
+      <td class="num">${c ? fmtPrice(c.price_usd) : fmtPrice(w.last_price || 0)}</td>
+      <td class="num">${c ? fmtPct(c.price_change_h1) : "—"}</td>
+      <td class="num">${c ? fmtCompact(c.liquidity_usd) : "—"}</td>
+      <td class="num">${c ? (c.score != null ? `<span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>` : `<span class="flag">fails filters</span>`) : "—"}</td>
+      <td class="num" style="color:var(--faint)">${relTime(w.added_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="small" data-watch-buy="${escapeHtml(key)}">I bought this</button>
+        <button class="small ghost" data-open-url="https://dexscreener.com/${escapeHtml(w.chain)}/${escapeHtml(w.pair_address)}">Open ↗</button>
+        <button class="icon on" data-star="${escapeHtml(key)}" title="Remove from watchlist">★</button>
+      </td>
+    </tr>`;
+  }).join("");
+  target.innerHTML = `<div class="table-wrap"><table style="min-width:720px">
+    <thead><tr><th>Coin</th><th style="text-align:right">Price</th><th style="text-align:right">1h</th>
+    <th style="text-align:right">Liquidity</th><th style="text-align:right">Score</th>
+    <th style="text-align:right">Added</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Feed tab — read-only public signals, meme-coin focused
+ *
+ * Eight sources merged into one stream. Every source loads and fails
+ * independently: a blocked or down feed drops out of the stream and is
+ * named in the status line, never an error page.
+ *
+ * On X/Twitter: there is no free public API, Nitter's public instances
+ * have collapsed, and scraping X breaks its terms of service. So this
+ * does not read X — it hands off, deep-linking into X's own search for
+ * a ticker or contract address, which is what you'd type yourself.
+ * ------------------------------------------------------------------ */
+
+const FEED = {
+  loadedAt: 0, loading: false, mood: null, items: [], failed: [], ok: 0,
+  filter: "all", query: "", narrative: "",
+};
+
+const MEME_RE = /meme|doge|shiba?|pepe|bonk|\bwif\b|floki|\binu\b|frog coin|moon ?shot|pump\.?fun|degen|fartcoin|\bcat coin\b|trump coin|\bmog\b|brett|popcat/i;
+
+const SUBREDDITS = ["CryptoMoonShots", "memecoins", "SatoshiStreetBets", "solana"];
+
+const GECKO = "https://api.geckoterminal.com/api/v2";
+
+function isMemeText(text) { return MEME_RE.test(String(text || "")); }
+
+/** X search deep-link — a handoff, never a scrape. */
+function xSearchUrl(term) {
+  return "https://x.com/search?q=" + encodeURIComponent(term) + "&f=live";
+}
+
+function feedTime(item) { return item.time || 0; }
+
+/* ---- narratives ----
+ * Meme coins don't trade on fundamentals, they trade on themes. Knowing
+ * that dog coins are hot and frog coins are cold this afternoon is the
+ * single most useful thing a feed can tell you, so every item is tagged
+ * and the themes are ranked by how loudly they're being talked about. */
+const NARRATIVES = [
+  ["dogs", "Dog coins", /\b(doge|dogecoin|shib|shiba|inu|bonk|wif|dogwifhat|floki|dog\b|puppy|corgi)/i],
+  ["frogs", "Frogs", /\b(pepe|frog|brett|apu|wojak)/i],
+  ["cats", "Cats", /\b(popcat|cat\b|cats\b|meow|mew\b|kitty|paw)/i],
+  ["politics", "Politics", /\b(trump|maga|biden|potus|election|president|政治|政)/i],
+  ["ai", "AI coins", /\b(ai\b|artificial intelligence|gpt|agent|bot\b|neural)/i],
+  ["celebrity", "Celebrity", /\b(elon|musk|kanye|drake|celebrity|influencer)/i],
+  ["food", "Food", /\b(banana|pizza|burger|taco|coffee|beer|milk|cheese)/i],
+  ["gaming", "Gaming", /\b(game|gaming|play2earn|p2e|nft game|metaverse)/i],
+  ["launchpad", "New launches", /\b(pump\.?fun|launchpad|fair launch|presale|bonding curve|just launched)/i],
+  ["etf", "ETFs & regulation", /\b(etf|sec\b|regulat|lawsuit|approval|ruling)/i],
+];
+
+function narrativesFor(text) {
+  const hay = String(text || "");
+  const hits = [];
+  for (const [id, label, re] of NARRATIVES) if (re.test(hay)) hits.push({ id, label });
+  return hits;
+}
+
+/** Rank themes by how much of the feed is talking about them. */
+function rankNarratives() {
+  const counts = new Map();
+  for (const item of FEED.items) {
+    const text = `${item.title} ${item.description || ""} ${item.source}`;
+    for (const n of narrativesFor(text)) {
+      if (!counts.has(n.id)) counts.set(n.id, { id: n.id, label: n.label, items: 0, coins: [] });
+      counts.get(n.id).items++;
+    }
+  }
+  // Coins from the latest scan that belong to each theme, best first.
+  for (const c of state.passing) {
+    for (const n of narrativesFor(`${c.symbol} ${c.name}`)) {
+      if (!counts.has(n.id)) counts.set(n.id, { id: n.id, label: n.label, items: 0, coins: [] });
+      counts.get(n.id).coins.push(c);
+    }
+  }
+  return [...counts.values()]
+    .map((n) => {
+      n.coins.sort((a, b) => b.score - a.score);
+      // Average 6h move of this theme's coins: is the money agreeing with the talk?
+      const moves = n.coins.map((c) => c.price_change_h6).filter((v) => Number.isFinite(v));
+      n.move = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
+      n.heat = n.items + n.coins.length * 2;
+      return n;
+    })
+    .filter((n) => n.heat > 1)
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, 6);
+}
+
+/** Coins in the current scan that a feed item actually names. */
+function coinsMentioned(item) {
+  const hay = ` ${item.title} ${item.description || ""} `.toUpperCase();
+  const seen = new Set();
+  const out = [];
+  for (const c of state.passing) {
+    const sym = String(c.symbol || "").toUpperCase();
+    if (sym.length < 3 || seen.has(sym)) continue;
+    if (hay.indexOf(` ${sym} `) >= 0 || hay.indexOf(`$${sym}`) >= 0 || hay.indexOf(`${sym}/`) >= 0) {
+      seen.add(sym);
+      out.push(c);
+    }
+    if (out.length >= 2) break;
+  }
+  return out;
+}
+
+/* ---- source parsers: each returns an array of unified items ---- */
+
+function parseNews(payload) {
+  const rows = payload && Array.isArray(payload.Data) ? payload.Data : null;
+  if (!rows) throw new Error("shape");
+  return rows.slice(0, 40).map((n) => ({
+    kind: "news",
+    title: String(n.title || ""),
+    url: String(n.url || ""),
+    source: String((n.source_info && n.source_info.name) || n.source || "news"),
+    time: Number(n.published_on) * 1000 || 0,
+    meme: isMemeText(`${n.title} ${n.categories} ${n.body}`),
+  }));
+}
+
+function parseReddit(payload, sub) {
+  const children = payload && payload.data && Array.isArray(payload.data.children) ? payload.data.children : null;
+  if (!children) throw new Error("shape");
+  return children
+    .filter((ch) => ch && ch.data && !ch.data.stickied)
+    .map((ch) => ch.data)
+    .filter((d) => sub === "solana" ? isMemeText(d.title) : true)  // r/solana is broad: meme posts only
+    .map((d) => ({
+      kind: "reddit",
+      title: String(d.title || ""),
+      url: "https://www.reddit.com" + String(d.permalink || ""),
+      source: "r/" + String(d.subreddit || sub),
+      time: Number(d.created_utc) * 1000 || 0,
+      score: Number(d.score) || 0,
+      id: String(d.permalink || d.title),
+      meme: true,
+    }));
+}
+
+function parseTrendingSearch(payload) {
+  const coins = payload && Array.isArray(payload.coins) ? payload.coins : null;
+  if (!coins) throw new Error("shape");
+  return coins.map((c) => c.item).filter(Boolean).slice(0, 10).map((t, i) => ({
+    kind: "trending",
+    title: `${t.symbol || "?"} — ${t.name || ""}`,
+    url: "https://www.coingecko.com/en/coins/" + encodeURIComponent(t.id || ""),
+    source: "search rank #" + (i + 1),
+    time: 0,
+    symbol: String(t.symbol || ""),
+    meme: isMemeText(`${t.name} ${t.symbol}`),
+  }));
+}
+
+/** GeckoTerminal pools: the feed other meme apps run on. */
+function parsePools(payload, kind) {
+  const rows = payload && Array.isArray(payload.data) ? payload.data : null;
+  if (!rows) throw new Error("shape");
+  return rows.slice(0, 20).map((row) => {
+    const a = row.attributes || {};
+    const rel = row.relationships || {};
+    const netId = dig(rel, "network", "data", "id") || String(row.id || "").split("_")[0];
+    const chain = String(netId || "").toLowerCase();
+    const address = String(a.address || String(row.id || "").split("_").slice(1).join("_"));
+    const h1 = num(dig(a, "price_change_percentage", "h1"));
+    const vol = num(dig(a, "volume_usd", "h24"));
+    return {
+      kind,
+      title: String(a.name || "?"),
+      url: `https://www.geckoterminal.com/${encodeURIComponent(chain)}/pools/${encodeURIComponent(address)}`,
+      source: chain,
+      time: a.pool_created_at ? Date.parse(a.pool_created_at) || 0 : 0,
+      chain,
+      pair: address,
+      symbol: String(a.name || "").split("/")[0].trim(),
+      liquidity: num(a.reserve_in_usd),
+      volume: vol,
+      change_h1: h1,
+      meme: true,
+    };
+  });
+}
+
+function parseBoosts(payload) {
+  if (!Array.isArray(payload)) throw new Error("shape");
+  return payload.slice(0, 12).map((b) => ({
+    kind: "promo",
+    title: `${String(b.tokenAddress || "").slice(0, 12)}… boosted`,
+    url: String(b.url || ""),
+    source: String(b.chainId || "?"),
+    time: 0,
+    amount: num(b.totalAmount),
+    token: String(b.tokenAddress || ""),
+    chain: String(b.chainId || "").toLowerCase(),
+    description: String(b.description || ""),
+    meme: true,
+  }));
+}
+
+function parseProfiles(payload) {
+  if (!Array.isArray(payload)) throw new Error("shape");
+  return payload.slice(0, 12).map((p) => ({
+    kind: "promo",
+    title: `${String(p.tokenAddress || "").slice(0, 12)}… new profile`,
+    url: String(p.url || ""),
+    source: String(p.chainId || "?"),
+    time: 0,
+    token: String(p.tokenAddress || ""),
+    chain: String(p.chainId || "").toLowerCase(),
+    description: String(p.description || ""),
+    meme: true,
+  }));
+}
+
+/* X posts, when a source is configured.
+ *
+ * No free way to read X exists: no free API tier, the public Nitter mirrors
+ * are gone, and X's own embed no longer renders for logged-out visitors.
+ * Scraping X breaks its terms, so this does the one legitimate thing left —
+ * it reads from whatever tweet source YOU have access to. Any endpoint that
+ * returns JSON works; the three common response shapes are all handled. */
+function parseTweets(payload) {
+  let rows = null;
+  let users = {};
+
+  if (Array.isArray(payload)) {
+    rows = payload;                                   // plain array
+  } else if (payload && Array.isArray(payload.data)) {
+    rows = payload.data;                              // X API v2
+    const list = dig(payload, "includes", "users");
+    if (Array.isArray(list)) for (const u of list) users[u.id] = u.username;
+  } else if (payload && Array.isArray(payload.tweets)) {
+    rows = payload.tweets;                            // several resellers
+  } else if (payload && Array.isArray(payload.results)) {
+    rows = payload.results;
+  }
+  if (!rows) throw new Error("unrecognised tweet payload");
+
+  return rows.slice(0, 25).map((t) => {
+    const author = String(
+      dig(t, "author", "userName") || dig(t, "author", "username") ||
+      dig(t, "user", "screen_name") || t.username || users[t.author_id] || "");
+    const id = String(t.id || t.id_str || t.tweet_id || "");
+    const created = t.created_at || t.createdAt || t.date || "";
+    const likes = num(t.likeCount || t.like_count || dig(t, "public_metrics", "like_count"));
+    return {
+      kind: "tweet",
+      title: String(t.text || t.full_text || t.content || ""),
+      url: String(t.url || t.tweetUrl ||
+        (author && id ? `https://x.com/${author}/status/${id}` : xSearchUrl("memecoin"))),
+      source: author ? "@" + author : "X",
+      time: created ? (Date.parse(created) || 0) : 0,
+      score: likes || 0,
+      id: id ? "tweet|" + id : undefined,
+      meme: true,
+    };
+  }).filter((t) => t.title);
+}
+
+function xFeedUrl() {
+  const template = String(PREFS.xUrl || "").trim();
+  if (!template || !/^https:\/\//i.test(template)) return null;
+  const query = "(memecoin OR pumpfun OR \"meme coin\") -is:retweet";
+  return template.indexOf("{query}") >= 0
+    ? template.replace("{query}", encodeURIComponent(query))
+    : template;
+}
+
+async function fetchTweets() {
+  const url = xFeedUrl();
+  if (!url) return null;
+  const headers = { Accept: "application/json" };
+  if (PREFS.xKey) headers.Authorization = PREFS.xKey;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return parseTweets(await res.json());
+}
+
+async function loadFeed(force) {
+  if (FEED.loading) return;
+  if (!force && FEED.loadedAt && Date.now() - FEED.loadedAt < 5 * 60 * 1000) { renderFeed(); return; }
+  FEED.loading = true;
+  const btn = $("#btn-feed-refresh");
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  renderFeed(true);
+
+  const sources = [
+    ["Headlines", "https://min-api.cryptocompare.com/data/v2/news/?lang=EN", parseNews],
+    ["Trending searches", "https://api.coingecko.com/api/v3/search/trending", parseTrendingSearch],
+    ["Trending pools", `${GECKO}/networks/trending_pools?page=1`, (p) => parsePools(p, "trending_pool")],
+    ["New pools", `${GECKO}/networks/new_pools?page=1`, (p) => parsePools(p, "newpool")],
+    ["Paid boosts", API + "/token-boosts/top/v1", parseBoosts],
+    ["New profiles", API + "/token-profiles/latest/v1", parseProfiles],
+  ];
+  if (xFeedUrl()) sources.push(["X posts", null, null]);
+  for (const sub of SUBREDDITS) {
+    sources.push([`r/${sub}`, `https://www.reddit.com/r/${sub}/hot.json?limit=15&raw_json=1`,
+                  (p) => parseReddit(p, sub)]);
+  }
+
+  const items = [];
+  const failed = [];
+  let okCount = 0;
+
+  await Promise.all([
+    (async () => {
+      try {
+        const m = await getJson("https://api.alternative.me/fng/?limit=1");
+        FEED.mood = m && Array.isArray(m.data) && m.data[0] ? m.data[0] : null;
+        if (FEED.mood) okCount++;
+      } catch (err) { FEED.mood = null; failed.push("Market mood"); }
+    })(),
+    ...sources.map(async ([name, url, parse]) => {
+      try {
+        const parsed = url === null ? await fetchTweets() : parse(await getJson(url));
+        if (!parsed.length) throw new Error("empty");
+        items.push(...parsed);
+        okCount++;
+      } catch (err) {
+        failed.push(name);
+      }
+    }),
+  ]);
+
+  // Reddit cross-posts land in several subs; keep the highest-scoring copy.
+  const byId = new Map();
+  for (const item of items) {
+    const id = item.id || (item.kind + "|" + (item.url || item.title));
+    const prev = byId.get(id);
+    if (!prev || (item.score || 0) > (prev.score || 0)) byId.set(id, item);
+  }
+
+  FEED.items = [...byId.values()];
+  FEED.failed = failed;
+  FEED.ok = okCount;
+  FEED.loadedAt = Date.now();
+  FEED.loading = false;
+  btn.disabled = false;
+  btn.textContent = "Refresh feed";
+  renderFeed();
+}
+
+/* ---- rendering ---- */
+
+const FEED_FILTERS = [
+  ["all", "Everything"],
+  ["trending_pool", "Trending pools"],
+  ["newpool", "Brand new"],
+  ["news", "News"],
+  ["tweet", "X posts"],
+  ["reddit", "Reddit"],
+  ["trending", "Searches"],
+  ["promo", "Promoted"],
+];
+
+function visibleFeed() {
+  const q = FEED.query.trim().toLowerCase();
+  let rows = FEED.items;
+  if (FEED.filter !== "all") rows = rows.filter((i) => i.kind === FEED.filter);
+  if (FEED.narrative) {
+    rows = rows.filter((i) => narrativesFor(`${i.title} ${i.description || ""}`)
+      .some((n) => n.id === FEED.narrative));
+  }
+  if (q) rows = rows.filter((i) => (i.title + " " + i.source + " " + (i.description || "")).toLowerCase().includes(q));
+  const sort = PREFS.feedSort || "smart";
+  const sorters = {
+    // Pools by volume, everything else newest first — the default mix.
+    smart: (a, b) => (a.kind === b.kind && (a.kind === "trending_pool" || a.kind === "newpool"))
+      ? (b.volume || 0) - (a.volume || 0)
+      : feedTime(b) - feedTime(a),
+    new: (a, b) => feedTime(b) - feedTime(a),
+    active: (a, b) => (b.volume || b.score || 0) - (a.volume || a.score || 0),
+    movers: (a, b) => (b.change_h1 || -Infinity) - (a.change_h1 || -Infinity),
+  };
+  return rows.slice().sort(sorters[sort] || sorters.smart).slice(0, 80);
+}
+
+const KIND_LABEL = {
+  news: ["News", "k-news"], reddit: ["Reddit", "k-reddit"], tweet: ["X", "k-tweet"],
+  trending: ["Trending", "k-trend"], trending_pool: ["Hot pool", "k-pool"],
+  newpool: ["New pool", "k-new"], promo: ["Promoted", "k-promo"],
+};
+
+function feedItemHtml(item) {
+  const [label, cls] = KIND_LABEL[item.kind] || ["Item", ""];
+  const tags = narrativesFor(`${item.title} ${item.description || ""}`)
+    .slice(0, 2)
+    .map((n) => `<span class="narr-tag">${escapeHtml(n.label)}</span>`).join("");
+
+  // Facts line — only the numbers this kind of item actually has.
+  const facts = [];
+  if (item.volume) facts.push(`<b>${fmtCompact(item.volume)}</b> 24h vol`);
+  if (item.liquidity) facts.push(`<b>${fmtCompact(item.liquidity)}</b> liquidity`);
+  if (Number.isFinite(item.change_h1) && item.change_h1) facts.push(`${fmtPct(item.change_h1)} 1h`);
+  if (item.score) facts.push(`▲ ${item.score}`);
+  if (item.amount) facts.push(`<b>$${Math.round(item.amount)}</b> spent promoting`);
+
+  // Coins from the current scan that this item names — the actionable bridge.
+  const mentioned = coinsMentioned(item).map((c) => `
+    <button class="coin-chip" data-feed-score="${escapeHtml(c.chain + ":" + c.pair_address)}"
+      title="Score ${escapeHtml(c.symbol)} with the scanner">
+      ${escapeHtml(c.symbol)} <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+    </button>`).join("");
+
+  const actions = [];
+  if (item.chain && item.pair) {
+    actions.push(`<button class="small" data-feed-score="${escapeHtml(item.chain + ":" + item.pair)}">Score it</button>`);
+  }
+  const xTerm = item.token || item.symbol || (item.title || "").split("/")[0].trim();
+  if (xTerm && item.kind !== "news" && item.kind !== "reddit" && item.kind !== "tweet") {
+    actions.push(`<button class="small ghost" data-open-url="${escapeHtml(xSearchUrl(xTerm))}">Search X ↗</button>`);
+  }
+  if (item.token) {
+    actions.push(`<button class="small ghost" data-copy="${escapeHtml(item.token)}">Copy address</button>`);
+  }
+
+  return `<article class="feed-item">
+    <div class="fi-head">
+      <span class="kind ${cls}">${escapeHtml(label)}</span>
+      <span class="fi-src">${escapeHtml(item.source)}</span>
+      ${item.time ? `<span class="fi-time">${escapeHtml(relTime(item.time))}</span>` : ""}
+      ${tags}
+    </div>
+    <a class="fi-title" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+    ${item.description ? `<p class="fi-desc">${escapeHtml(item.description.slice(0, 140))}</p>` : ""}
+    ${facts.length ? `<div class="fi-facts">${facts.join('<span class="dot">·</span>')}</div>` : ""}
+    ${mentioned ? `<div class="fi-coins"><span class="fi-coins-label">In your scan:</span>${mentioned}</div>` : ""}
+    ${actions.length ? `<div class="fi-actions">${actions.join("")}</div>` : ""}
+  </article>`;
+}
+
+function renderFeed(loading) {
+  $("#feed-updated").textContent = FEED.loadedAt ? "Updated " + relTime(FEED.loadedAt) : "";
+
+  // Stat tiles
+  const tiles = $("#feed-tiles");
+  if (FEED.loadedAt) {
+    const moodValue = FEED.mood ? Number(FEED.mood.value) : null;
+    const pools = FEED.items.filter((i) => i.kind === "trending_pool" || i.kind === "newpool").length;
+    const chatter = FEED.items.filter((i) => i.kind === "reddit").length;
+    const headlines = FEED.items.filter((i) => i.kind === "news" && i.meme).length;
+    tiles.hidden = false;
+    tiles.innerHTML = `
+      <div class="tile"><div class="t-label">Market mood</div>
+        <div class="t-value">${FEED.mood ? escapeHtml(FEED.mood.value_classification) : "—"}</div>
+        ${FEED.mood ? `<div class="t-delta" style="color:var(--muted)">${moodValue}/100 — extremes often mark turns</div>` : ""}</div>
+      <div class="tile"><div class="t-label">Live pools</div><div class="t-value">${pools}</div></div>
+      <div class="tile"><div class="t-label">Meme headlines</div><div class="t-value">${headlines}</div></div>
+      <div class="tile"><div class="t-label">Reddit chatter</div><div class="t-value">${chatter}</div></div>`;
+  } else {
+    tiles.hidden = true;
+  }
+
+  // Filter chips
+  $("#feed-chips").innerHTML = FEED_FILTERS.filter(([key]) => key !== "tweet" || xFeedUrl()).map(([key, label]) => {
+    const n = key === "all" ? FEED.items.length : FEED.items.filter((i) => i.kind === key).length;
+    return `<button class="chip ${FEED.filter === key ? "on" : ""}" data-feed-filter="${key}">${label}${n ? ` <span style="opacity:.65">${n}</span>` : ""}</button>`;
+  }).join("");
+
+  // Status line
+  const status = $("#feed-status");
+  if (loading && !FEED.items.length) {
+    status.innerHTML = `<div class="notice"><p style="margin:0">Loading sources…</p></div>`;
+  } else if (FEED.loadedAt && FEED.failed.length && !FEED.ok) {
+    status.innerHTML = networkErrorNotice(new Error("every feed source failed"));
+  } else if (FEED.loadedAt && FEED.failed.length) {
+    status.innerHTML = `<div class="notice"><p style="margin:0">${FEED.ok} sources loaded ·
+      <span style="color:var(--faint)">unavailable right now: ${escapeHtml(FEED.failed.join(", "))}</span></p></div>`;
+  } else {
+    status.innerHTML = "";
+  }
+
+  // Narratives — what the market is actually talking about
+  const narrBox = $("#feed-narratives");
+  const themes = FEED.loadedAt ? rankNarratives() : [];
+  if (themes.length) {
+    narrBox.innerHTML = `
+      <div class="feed-sec">
+        <h2>Narratives right now <span class="sub">themes ranked by how much of the feed is talking about them</span></h2>
+        <div class="narr-grid">
+          ${themes.map((n) => {
+            const coins = n.coins.slice(0, 3).map((c) => `
+              <button class="coin-chip" data-feed-score="${escapeHtml(c.chain + ":" + c.pair_address)}">
+                ${escapeHtml(c.symbol)} <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+              </button>`).join("");
+            const moveText = n.move === null ? "no coins in your scan yet"
+              : `coins ${n.move >= 0 ? "up" : "down"} ${Math.abs(n.move).toFixed(0)}% avg over 6h`;
+            return `<div class="narr ${FEED.narrative === n.id ? "on" : ""}">
+              <button class="narr-head" data-narrative="${escapeHtml(n.id)}">
+                <span class="narr-name">${escapeHtml(n.label)}</span>
+                <span class="narr-heat">${n.items} mention${n.items === 1 ? "" : "s"}</span>
+              </button>
+              <div class="narr-move ${n.move === null ? "" : (n.move >= 0 ? "pos" : "neg")}">${escapeHtml(moveText)}</div>
+              ${coins ? `<div class="fi-coins">${coins}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+        ${FEED.narrative ? `<button class="section-toggle" data-narrative="">▾ Clear theme filter</button>` : ""}
+      </div>`;
+  } else {
+    narrBox.innerHTML = "";
+  }
+
+  // Stream
+  const stream = $("#feed-stream");
+  const rows = visibleFeed();
+  if (!FEED.loadedAt && loading) {
+    stream.innerHTML = `<div class="feed-sec">${'<div class="skel-row"></div>'.repeat(6)}</div>`;
+  } else if (!rows.length) {
+    stream.innerHTML = `<div class="feed-sec"><div class="feed-err">${
+      FEED.items.length ? "Nothing matches that filter or search." : "No feed items loaded. Try Refresh."}</div></div>`;
+  } else {
+    stream.innerHTML = `<div class="feed-sec">${rows.map(feedItemHtml).join("")}</div>`;
+  }
+
+  // X handoff panel
+  const tickers = FEED.items.filter((i) => i.kind === "trending" && i.meme).slice(0, 6);
+  const xOn = !!xFeedUrl();
+  const xLoaded = FEED.items.filter((i) => i.kind === "tweet").length;
+  $("#feed-social").innerHTML = `
+    <div class="feed-sec">
+      <h2>Social <span class="sub">${xOn
+        ? (xLoaded ? `${xLoaded} X posts in the stream` : "X source set but returned nothing — check Settings")
+        : "no X source set — these open X's own search"}</span></h2>
+      ${xOn ? "" : `<div class="feed-err" style="padding-bottom:6px">Want real posts in the stream?
+        Settings → <b>X (Twitter) feed</b> takes any URL that returns tweets as JSON.</div>`}
+      <div class="chips" style="margin:6px 0">
+        ${tickers.map((t) => `<button class="chip" data-open-url="${escapeHtml(xSearchUrl("$" + t.symbol))}">$${escapeHtml(t.symbol)} ↗</button>`).join("")}
+        <button class="chip" data-open-url="${escapeHtml(xSearchUrl("memecoin OR pumpfun min_faves:50"))}">Meme chatter ↗</button>
+        <button class="chip" data-open-url="${escapeHtml(xSearchUrl("solana memecoin min_faves:100"))}">Solana memes ↗</button>
+      </div>
+      <div class="feed-err" style="padding-top:2px">Any coin's <b>Score it</b> button runs it through the same
+        filters and scoring the scanner uses — that's the check to trust over hype.</div>
+    </div>`;
+}
+
+/* Score a coin straight from the feed — the bridge from chatter to numbers. */
+async function scoreFromFeed(key) {
+  const [chain, pair] = key.split(":");
+  $("#explain-term").textContent = "Scoring…";
+  $("#explain-text").textContent = "Fetching live pair data.";
+  openDialog($("#dlg-explain"));
+  const c = await fetchPair(chain, pair);
+  if (!c) {
+    $("#explain-term").textContent = "Couldn't price it";
+    $("#explain-text").textContent = "No live data came back for that pair — it may be too new to be indexed, or the connection failed.";
+    return;
+  }
+  const reasons = applyFilters(c);
+  const term = $("#explain-term");
+  const text = $("#explain-text");
+  if (reasons.length) {
+    term.textContent = `${c.symbol} — fails the safety filters`;
+    text.innerHTML = `<div>${reasons.map((r) => `<span class="flag">${escapeHtml(r)}</span>`).join("")}</div>
+      <p style="margin-top:10px">These are disqualifiers, not opinions: a coin you can't exit safely isn't worth a score.</p>`;
+    return;
+  }
+  scoreCandidate(c);
+  const b = c.score_breakdown;
+  term.textContent = `${c.symbol} — scores ${c.score.toFixed(0)}/100`;
+  text.innerHTML = `
+    ${meterRow("Liquidity", b.liquidity)}${meterRow("Turnover", b.turnover)}${meterRow("Momentum", b.momentum)}
+    ${meterRow("Buy pressure", b.buy_pressure)}${meterRow("Age fit", b.age_fit)}${meterRow("Safety", b.safety)}
+    ${(c.flags || []).length ? `<div style="margin-top:8px">${c.flags.map((f) => `<span class="flag">${escapeHtml(f)}</span>`).join("")}</div>` : ""}
+    <p style="margin-top:10px">${fmtCompact(c.liquidity_usd)} liquidity · ${fmtCompact(c.volume_h24)} 24h volume ·
+      ${(c.buy_ratio_h1 * 100).toFixed(0)}% of 1h trades are buys.</p>`;
+}
+
+$("#btn-feed-refresh").addEventListener("click", () => loadFeed(true));
+
+let feedTimer = null;
+function scheduleFeedAuto() {
+  clearInterval(feedTimer);
+  if (!PREFS.feedAuto) return;
+  feedTimer = setInterval(() => {
+    if (!document.hidden && $("#view-feed").classList.contains("active")) loadFeed(true);
+  }, 120000);
+}
+
+$("#feed-auto").addEventListener("change", (e) => {
+  PREFS.feedAuto = e.target.checked;
+  savePrefs();
+  scheduleFeedAuto();
+});
+
+$("#feed-sort").addEventListener("change", (e) => {
+  PREFS.feedSort = e.target.value;
+  savePrefs();
+  renderFeed();
+});
+
+$("#feed-search").addEventListener("input", (() => {
+  let timer = null;
+  return (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { FEED.query = e.target.value; renderFeed(); }, 120);
+  };
+})());
+
+$("#view-feed").addEventListener("click", async (e) => {
+  const chip = e.target.closest("[data-feed-filter]");
+  if (chip) { FEED.filter = chip.dataset.feedFilter; renderFeed(); return; }
+  const narr = e.target.closest("[data-narrative]");
+  if (narr) {
+    const id = narr.dataset.narrative;
+    FEED.narrative = (FEED.narrative === id) ? "" : id;
+    renderFeed();
+    return;
+  }
+  const scoreBtn = e.target.closest("[data-feed-score]");
+  if (scoreBtn) { scoreFromFeed(scoreBtn.dataset.feedScore); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Learn tab
+ * ------------------------------------------------------------------ */
+
+function renderLearn() {
+  const el = $("#learn-content");
+  if (el.dataset.built) return;
+  el.dataset.built = "1";
+  const g = GLOSSARY.slice(0, 7)  // the scoring flags; reject reasons repeat the same ideas
+    .map(([, term, text]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(text)}</dd>`).join("");
+  el.innerHTML = `
+  <section>
+    <h2>How the score works</h2>
+    <p>Every coin that survives the safety filters gets a 0–100 score from six parts.
+       Click any row in Find to see its six meters — <b>no score is a black box</b>.</p>
+    <ul>
+      <li><b>Momentum (25%)</b> — is the price moving up right now? A blend of the last hour and last 6 hours. Crashing scores near zero; a huge finished pump also scores LOW, because you'd be late.</li>
+      <li><b>Turnover (20%)</b> — how much the coin trades compared to its pool size. High turnover = real, active interest.</li>
+      <li><b>Buy pressure (20%)</b> — what share of recent trades are buys, discounted when there are too few trades to mean anything.</li>
+      <li><b>Liquidity (15%)</b> — how much money backs the pool. This is what decides whether you can EXIT.</li>
+      <li><b>Age fit (10%)</b> — old enough to have dodged the instant-rug window, young enough to still be a meme play.</li>
+      <li><b>Safety (10%)</b> — starts perfect and loses points for each red flag below.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Red flags, in plain words</h2>
+    <p>These appear as small tags on coins. <b>Tap any tag anywhere in the app</b> and it explains itself.</p>
+    <dl>${g}</dl>
+  </section>
+  <section>
+    <h2>The four plays</h2>
+    <p>A score says <i>how good</i>, not <i>good for what</i>. Each scan sorts its best coins into
+       four trades with different hold times — a coin appears in one section only, the first it
+       qualifies for, and every card shows the pair's age so freshness is never hidden:</p>
+    <ul>
+      <li><b>Quick flips</b> — trading well above its own normal hourly volume with buyers
+          dominant. In and out; minutes to hours, and it needs watching.</li>
+      <li><b>Swing trades</b> — up over 6h <i>and</i> 24h without a vertical candle. A trend
+          rather than a spike; check it a few times a day. Hours to days.</li>
+      <li><b>Long holds</b> — a week or more old, deep liquidity, high safety, public links. The
+          only kind you can size up and sit on; days to weeks.</li>
+      <li><b>Lottery tickets</b> — under a day old with early traction. Biggest upside, and by far
+          the most likely to go to zero. Smallest size you can be bothered with.</li>
+      <li><b>No clear angle</b> — passed every safety filter but fits none of the above. Tradeable,
+          just nothing pushing it. Fine to ignore.</li>
+    </ul>
+    <p>The whole results table is grouped this way too, so you're never reading one undifferentiated
+       list — and the <b>Grouped by buy type</b> button flips it back to a flat list with a type
+       badge on each row if you prefer. Empty sections are normal, not a failure: most scans deserve
+       zero buys.</p>
+  </section>
+  <section>
+    <h2>Tracking what you bought</h2>
+    <p>After you buy in FOMO, press <b>I bought this</b>. The Positions tab then shows a
+       <b>stop → target rail</b> for each coin: a marker sliding between your stop loss on the left
+       and your take-profit on the right, so you can see at a glance how close a trade is to either
+       exit without reading a single number.</p>
+    <p>Turn on <b>Alert me</b> and your browser tells you the moment an exit rule fires — once per
+       change in verdict, not every check, so it never nags. When you sell, press
+       <b>Sold it — log the result</b> and enter your fill: the trade moves into a journal with
+       realized P&amp;L, your win–loss record, and total realized profit. That record is the only
+       honest way to find out whether the scores are actually working for you.</p>
+  </section>
+  <section>
+    <h2>Before you buy — 60-second checklist</h2>
+    <ol>
+      <li><b>Open the chart</b> (Chart ↗). Is the rise steady, or one vertical candle? Vertical = you're late.</li>
+      <li><b>Read the flags.</b> One flag is normal; three is a story.</li>
+      <li><b>Check you could exit:</b> your position should be a small fraction of the pool — under 1% of liquidity is comfortable.</li>
+      <li><b>Decide your exit BEFORE entering.</b> The pick card shows the stop and target prices — if you wouldn't honor the stop, don't enter.</li>
+      <li><b>Size it</b> so the stop loss costs an amount you're okay losing (see below).</li>
+      <li><b>Log it</b> with "I bought this" so the exit rules actually watch it.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Position sizing — the one rule that keeps you alive</h2>
+    <p>Risk a <b>fixed small slice of your bankroll per trade</b> — 1% is the classic. The math:
+       size = (bankroll × risk%) ÷ stop distance. With a $1,000 bankroll, 1% risk and this app's
+       25% stop loss, that's $1,000 × 1% ÷ 25% = <b>$40 per trade</b>. Ten straight losers — which
+       WILL happen in meme coins — costs 10%, not everything.</p>
+    <p>Set your bankroll and risk in <b>Settings → Position sizing</b> and the buy dialog computes this for you.</p>
+  </section>
+  <section>
+    <h2>Trading on FOMO — the honest version</h2>
+    <p>FOMO has <b>no public way for another app to connect to your account</b>, so nothing here can
+       (or should) log into it — be suspicious of anything that asks for your FOMO login. The flow instead:</p>
+    <ol>
+      <li>Tap <b>Copy address for FOMO</b> on a pick.</li>
+      <li>Open FOMO, paste the address into its search, and trade there.</li>
+      <li>Come back and tap <b>I bought this</b> — the Positions tab then watches your exits.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Coverage — why a coin might not be in a scan</h2>
+    <p>Each scan pulls from three funnels: GeckoTerminal's live trending and brand-new pool
+       feeds (100+ chains), DexScreener's paid-boost feed, and keyword searches — then re-prices
+       everything through DexScreener so all candidates are measured identically. It covers the
+       chains FOMO trades, Monad included.</p>
+    <p>Even so, <b>no scan is exhaustive</b> — thousands of pairs launch daily and a scan keeps the
+       most active few hundred. If you see a coin in FOMO that isn't listed, use
+       <b>Look up any coin</b> in the Find tab: paste its ticker or contract address (FOMO shows
+       the address on the token's page) and it's fetched and scored on demand, on any chain. That
+       path has no coverage limit.</p>
+    <p><b>How live are the prices?</b> These are free polling APIs — there is no streaming feed —
+       so the app refreshes the coins on screen about every 20 seconds, re-scores them, and checks
+       your positions every 30. Fast, but always seconds behind the chain: for an exact fill price,
+       trust FOMO at the moment you trade.</p>
+  </section>
+  <section>
+    <h2>Where the Feed comes from — and why no Twitter</h2>
+    <p>The Feed merges ten public, read-only sources: crypto headlines, four meme subreddits,
+       CoinGecko trending searches, GeckoTerminal's trending and brand-new pools (the same live
+       DEX data most meme scanners run on), DexScreener's paid boosts and new profiles, and the
+       Fear &amp; Greed index. Each loads independently — if one is blocked on your network the
+       rest still work, and the status line names what's missing.</p>
+    <p><b>X/Twitter needs a source you provide.</b> Three things are true at once: X has no free
+       API tier, the public Nitter mirrors that used to work have collapsed, and X's own embed
+       widget now renders only for logged-in visitors — it fails silently for everyone else.
+       Scraping X breaks its terms of service, so this app will not do that.</p>
+    <p>What it does instead: <b>Settings → X (Twitter) feed</b> accepts any URL that returns tweets
+       as JSON — a paid X API key behind your own small proxy, a third-party tweet provider, or
+       anything else you have access to. Put <code>{query}</code> where the search term belongs, add
+       an Authorization header if the service needs one, and real X posts join the Feed stream with
+       their own filter chip. Your key is stored <b>only in your browser</b>, never in the site's
+       code, and the site is public so it could never hold a secret anyway.</p>
+    <p>With no source set, the Feed still <b>hands off</b>: the Social panel and every coin's
+       <b>Search X</b> button open X's own live search for that ticker or contract address — the
+       search you'd type yourself, one tap away.</p>
+    <p><b>Narratives</b> sit above the stream. Meme coins don't trade on fundamentals, they trade on
+       themes — dogs, frogs, cats, politics, AI — and the money rotates between them constantly. Every
+       feed item is tagged, the themes are ranked by how much of the feed is discussing them, and each
+       shows the average 6h move of the coins in <i>your scan</i> belonging to it. That last number is
+       the honest one: it tells you whether the money agrees with the talk. A theme with loud mentions
+       and falling coins is a crowd arriving late; quiet mentions with rising coins is the opposite.
+       Tap any theme to filter the whole feed to it.</p>
+    <p>Where a story names a coin from your latest scan, that coin appears under it as a chip with its
+       live score — tap it to run the full scanner on the spot. That's the bridge from "people are
+       talking about this" to "here's what the numbers say".</p>
+    <p>Treat all of it as <b>where to look, never what to buy</b>. Hype is how exit liquidity gets
+       recruited: by the time something is loud everywhere, you may be the buyer someone was
+       waiting for. Any coin in the feed has a <b>Score it</b> button that runs it through the
+       same filters and scoring as the scanner — trust that over the noise.</p>
+  </section>
+  <section>
+    <h2>What this app cannot see</h2>
+    <p>The score reads market data only. It <b>cannot detect</b>: honeypots (coins you can buy but not sell),
+       unlocked liquidity a deployer can pull, insider wallets holding most of the supply, or coordinated
+       pump groups. For coins you're sizing up seriously, check the token on a scanner like rugcheck
+       or the audit tabs on the chart page. And the oldest rule: <b>never trade money you can't lose to zero</b> —
+       most meme coins go there.</p>
+  </section>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared bits
+ * ------------------------------------------------------------------ */
+
+function renderBadges() {
+  const n = Object.keys(loadPositions()).length;
+  const w = Object.keys(loadWatchlist()).length;
+  $("#pos-count").textContent = n || "";
+  $("#watch-count").textContent = w || "";
+}
+
+function networkErrorNotice(err) {
+  const isSafari = /apple/i.test(navigator.vendor || "");
+  const isFile = location.protocol === "file:";
+  if (isSafari && isFile) {
+    // Not a maybe: Safari always blocks fetch from a file-opened page.
+    return `
+      <div class="notice error">
+        <h3>Safari blocks this file from loading live prices</h3>
+        <p>Safari doesn't let a page opened straight off the disk download data —
+           Chrome and Firefox allow it, Safari doesn't. The app itself is fine;
+           it just needs to be opened the way Safari expects:</p>
+        <p><strong>1. Best fix:</strong> double-click <code>Coin&nbsp;Finder.command</code>
+           (it's in the same download). It opens this exact app in Safari properly —
+           just keep its small window open while you use the app.</p>
+        <p><strong>2. Or:</strong> open this file with Chrome or Firefox instead of Safari.</p>
+        <p>On an iPhone or iPad this <em>file</em> can't run — use the website version
+           instead: <code>https://mackmedley.github.io/Coin-Finder/</code></p>
+      </div>`;
+  }
+  return `
+    <div class="notice error">
+      <h3>Couldn't reach the price data</h3>
+      <p>The most likely cause is that your browser blocked the request to
+         <code>api.dexscreener.com</code> — some browsers refuse cross-site
+         requests from a file opened directly off your disk.</p>
+      <p><strong>Two things to try, in order:</strong></p>
+      <p>1. Check you're online, then try again.</p>
+      <p>2. If it keeps failing, double-click <code>Coin Finder.command</code> (Mac)
+         or <code>Coin Finder.bat</code> (Windows) from the same download — it opens
+         this same app in your browser in a way that's allowed to fetch data.</p>
+      <p style="opacity:0.7">Technical detail: ${escapeHtml(err.message || String(err))}</p>
+    </div>`;
+}
+
+function cacheScan() {
+  writeStore(STORE_LASTSCAN, {
+    t: state.scannedAt,
+    checked: state.checkedCount,
+    passing: state.passing,
+    rejected: state.rejected.map((c) => ({
+      symbol: c.symbol, name: c.name, chain: c.chain, pair_address: c.pair_address,
+      volume_h24: c.volume_h24, reject_reasons: c.reject_reasons,
+    })),
+  });
+}
+
+function hydrateScan() {
+  const cached = readStore(STORE_LASTSCAN, null);
+  if (!cached || !Array.isArray(cached.passing)) return;
+  state.passing = cached.passing;
+  state.rejected = cached.rejected || [];
+  state.scannedAt = cached.t || 0;
+  state.checkedCount = cached.checked || 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+async function doScan() {
+  if (state.scanning) return;
+  state.scanning = true;
+  const btn = $("#btn-scan");
+  btn.disabled = true;
+  btn.textContent = "Scanning…";
+  $("#find-status").innerHTML = "";
+  // Skeleton only when there's nothing to show — a rescan keeps the current
+  // table on screen instead of blanking it for a few seconds.
+  if (!state.scannedAt) {
+    $("#find-results").innerHTML = `<div class="table-wrap">${'<div class="skel-row"></div>'.repeat(7)}</div>`;
+  }
+
+  try {
+    const candidates = await discover();
+    if (!candidates.length) {
+      $("#find-status").innerHTML = `<div class="notice"><h3>No pairs came back</h3>
+        <p>The provider returned nothing for these chains. This can happen briefly;
+        try again in a minute, or widen the chain list in Settings.</p></div>`;
+      renderResults();
+      return;
+    }
+    const { passing, rejected } = rank(candidates);
+    state.passing = passing;
+    state.rejected = rejected;
+    state.scannedAt = Date.now();
+    state.checkedCount = candidates.length;
+    state.expandedKey = null;
+    cacheScan();
+    renderResults();
+    toast(`Scan done — ${passing.length} of ${candidates.length} passed`, "good");
+  } catch (err) {
+    $("#find-status").innerHTML = networkErrorNotice(err);
+    renderResults();
+  } finally {
+    state.scanning = false;
+    btn.disabled = false;
+    btn.textContent = "Scan";
+    if (PREFS.autoScan) scheduleAutoScan();  // manual scans reset the countdown too
+    renderScanAge();
+  }
+}
+
+/* Fast re-price: refresh the coins currently on screen without redoing
+   discovery. These APIs are poll-only (no streaming), so "live" means a
+   ~20s refresh of prices, liquidity, volume and momentum — then rescored. */
+async function repriceVisible() {
+  if (state.scanning || state.repricing || !state.passing.length) return;
+  if (document.hidden || !$("#view-find").classList.contains("active")) return;
+
+  const shown = visibleResults().slice(0, 30);
+  if (!shown.length) return;
+
+  const byChain = new Map();
+  for (const c of shown) {
+    if (!byChain.has(c.chain)) byChain.set(c.chain, []);
+    byChain.get(c.chain).push(c.pair_address);
+  }
+
+  state.repricing = true;
+  try {
+    const fresh = new Map();
+    await Promise.all([...byChain].map(async ([chain, addresses]) => {
+      for (let i = 0; i < addresses.length; i += 30) {
+        const batch = addresses.slice(i, i + 30).join(",");
+        const payload = await getJson(`${API}/latest/dex/pairs/${chain}/${batch}`).catch(() => null);
+        for (const pair of pairsFrom(payload)) {
+          const c = toCandidate(pair);
+          if (c.pair_address) fresh.set(c.chain + ":" + c.pair_address, c);
+        }
+      }
+    }));
+    if (!fresh.size) return;
+
+    let changed = 0;
+    state.passing = state.passing.map((old) => {
+      const next = fresh.get(candidateKey(old));
+      if (!next) return old;
+      changed++;
+      next.boost_amount = old.boost_amount;
+      return applyFilters(next).length ? Object.assign(next, { score: old.score }) : scoreCandidate(next);
+    });
+    if (changed) {
+      state.repricedAt = Date.now();
+      cacheScan();
+      renderResults();
+    }
+  } finally {
+    state.repricing = false;
+  }
+}
+
+async function doCheck(silent) {
+  if (state.checking) return;
+  const positions = loadPositions();
+  const keys = Object.keys(positions);
+  if (!keys.length) { state.signals = null; renderSignals(); return; }
+
+  state.checking = true;
+  const btn = $("#btn-check");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+  if (!silent) $("#pos-status").innerHTML = "";
+
+  try {
+    const results = await Promise.all(keys.map(async (key) => {
+      const p = positions[key];
+      const current = await fetchPair(p.chain, p.pair_address);
+      return [key, current];
+    }));
+
+    let failures = 0;
+    const signals = [];
+    const now = Date.now();
+    for (const [key, current] of results) {
+      const p = positions[key];
+      if (!current) failures++;
+      const signal = evaluatePosition(p, current);
+      if (signal.peak && signal.peak > p.peak_price_usd) p.peak_price_usd = signal.peak;
+      if (current && current.price_usd > 0) {
+        p.history = (p.history || []).concat({ t: now, p: current.price_usd }).slice(-60);
+      }
+      signals.push(signal);
+    }
+    savePositions(positions);
+    state.signals = signals;
+    renderSignals();
+    notifyExits(signals);
+
+    const actionable = signals.filter((s) => s.verdict !== "HOLD");
+    if (failures === keys.length && keys.length > 0) {
+      $("#pos-status").innerHTML = networkErrorNotice(new Error(`all ${failures} price lookups failed`));
+    } else if (!silent) {
+      toast(actionable.length
+        ? `${actionable.length} position${actionable.length === 1 ? "" : "s"} with an exit signal`
+        : "All positions holding — no exit rules triggered", actionable.length ? "bad" : "good");
+    } else if (actionable.length) {
+      toast(`${actionable.length} position${actionable.length === 1 ? "" : "s"} with an exit signal`, "bad");
+    }
+  } finally {
+    state.checking = false;
+    btn.disabled = false;
+    btn.textContent = "Check for sell signals";
+  }
+}
+
+/* Desktop alerts for exit signals — opt-in, and only when the verdict
+   CHANGES, so a position sitting on SELL doesn't nag every 30 seconds. */
+function notifyExits(signals) {
+  for (const s of signals) {
+    const key = s.position.key;
+    const previous = state.alerted[key];
+    if (s.verdict === "HOLD") { delete state.alerted[key]; continue; }
+    if (previous === s.verdict) continue;
+    state.alerted[key] = s.verdict;
+
+    const message = `${s.position.symbol}: ${s.verdict} — ${s.reasons[0] || ""}`;
+    toast(message, s.verdict === "TRIM" ? null : "bad");
+    try {
+      if (PREFS.notify && typeof Notification === "function" && Notification.permission === "granted") {
+        new Notification("Coin Finder — " + s.verdict, { body: message, tag: key });
+      }
+    } catch (err) { /* notifications unavailable; the toast already fired */ }
+  }
+}
+
+async function enableNotifications(on) {
+  PREFS.notify = on;
+  savePrefs();
+  if (!on) return;
+  try {
+    if (typeof Notification !== "function") { toast("This browser has no desktop alerts", "bad"); PREFS.notify = false; savePrefs(); return; }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      PREFS.notify = false;
+      savePrefs();
+      $("#notify-toggle").checked = false;
+      toast("Alerts blocked — allow notifications for this site to use them", "bad");
+    } else {
+      toast("Alerts on — you'll be told when an exit rule fires", "good");
+    }
+  } catch (err) {
+    PREFS.notify = false;
+    savePrefs();
+  }
+}
+
+async function refreshWatchlist() {
+  const watch = loadWatchlist();
+  const keys = Object.keys(watch);
+  if (!keys.length) { renderWatchlist(null); return; }
+  const btn = $("#btn-watch-refresh");
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  try {
+    const priced = {};
+    let failures = 0;
+    await Promise.all(keys.map(async (key) => {
+      const w = watch[key];
+      const c = await fetchPair(w.chain, w.pair_address);
+      if (!c) { failures++; return; }
+      // Score it with live thresholds, but tolerate coins that now fail filters.
+      if (applyFilters(c).length === 0) scoreCandidate(c);
+      else c.score = null;
+      priced[key] = c;
+      w.last_price = c.price_usd;
+    }));
+    saveWatchlist(watch);
+    renderWatchlist(priced);
+    if (failures === keys.length) toast("Couldn't price the watchlist — network problem?", "bad");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Refresh prices";
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Wiring
+ * ------------------------------------------------------------------ */
+
+function switchTab(name) {
+  PREFS.tab = name;
+  savePrefs();
+  $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
+  if (name === "positions") {
+    renderSignals();
+    // First visit with tracked positions: check automatically instead of
+    // making the user find the button.
+    if (!state.signals && Object.keys(loadPositions()).length) doCheck(true);
+  }
+  if (name === "watch") renderWatchlist(null);
+  if (name === "learn") renderLearn();
+  if (name === "feed") loadFeed(false);
+}
+
+$("#tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-view]");
+  if (btn) switchTab(btn.dataset.view);
+});
+
+$("#btn-scan").addEventListener("click", doScan);
+$("#btn-check").addEventListener("click", () => doCheck(false));
+$("#btn-watch-refresh").addEventListener("click", refreshWatchlist);
+
+$("#search").addEventListener("input", (() => {
+  let timer = null;
+  return (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { state.query = e.target.value; renderResults(); }, 120);
+  };
+})());
+
+$("#chain-chips").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-chain]");
+  if (!chip) return;
+  const chain = chip.dataset.chain;
+  if (state.chainFilter.size === 0) {
+    // From "all on", clicking one narrows to just it.
+    state.chainFilter = new Set([chain]);
+  } else if (state.chainFilter.has(chain)) {
+    state.chainFilter.delete(chain);
+    if (!state.chainFilter.size) state.chainFilter = new Set(); // back to all
+  } else {
+    state.chainFilter.add(chain);
+  }
+  renderResults();
+});
+
+/* One delegated handler for the whole find area: sort, expand, star, buy, copy. */
+$("#view-find").addEventListener("click", async (e) => {
+  const sort = e.target.closest("th[data-sort]");
+  if (sort) {
+    const key = sort.dataset.sort;
+    if (state.sortKey === key) state.sortDir *= -1;
+    else { state.sortKey = key; state.sortDir = key === "symbol" ? 1 : -1; }
+    renderResults();
+    return;
+  }
+  const playMore = e.target.closest("[data-play-more]");
+  if (playMore) {
+    const id = playMore.dataset.playMore;
+    state.playExpanded[id] = !state.playExpanded[id];
+    renderResults();
+    return;
+  }
+  if (e.target.closest("#toggle-rejected")) {
+    state.showRejected = !state.showRejected;
+    renderRejected();
+    return;
+  }
+  const star = e.target.closest("[data-star]");
+  if (star) {
+    e.stopPropagation();
+    toggleWatch(star.dataset.star);
+    return;
+  }
+  const buy = e.target.closest("[data-buy]");
+  if (buy) {
+    openBuyDialog(buy.dataset.buy);
+    return;
+  }
+  const open = e.target.closest("[data-open-url]");
+  if (open) {
+    openUrl(open.dataset.openUrl);
+    return;
+  }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+    return;
+  }
+  const row = e.target.closest("tr.row[data-key]");
+  if (row && !e.target.closest("a")) {
+    const key = row.dataset.key;
+    state.expandedKey = state.expandedKey === key ? null : key;
+    renderResults();
+  }
+});
+
+function toggleWatch(key) {
+  const watch = loadWatchlist();
+  if (watch[key]) {
+    delete watch[key];
+    toast("Removed from watchlist");
+  } else {
+    const c = findCandidate(key);
+    if (!c) return;
+    watch[key] = { key, chain: c.chain, pair_address: c.pair_address, symbol: c.symbol, added_at: Date.now(), last_price: c.price_usd };
+    toast(`Watching ${c.symbol} ★`, "good");
+  }
+  saveWatchlist(watch);
+  if ($("#view-find").classList.contains("active")) renderResults();
+  else renderWatchlist(null);
+}
+
+/* Positions area: expand, remove, note, copy. */
+$("#view-positions").addEventListener("click", async (e) => {
+  const remove = e.target.closest("[data-remove]");
+  if (remove) {
+    const positions = loadPositions();
+    const key = remove.dataset.remove;
+    if (positions[key] && confirm(`Stop tracking ${positions[key].symbol}?`)) {
+      delete positions[key];
+      savePositions(positions);
+      renderBadges();
+      state.posExpandedKey = null;
+      state.signals = (state.signals || []).filter((s) => s.position.key !== key);
+      renderSignals();
+      toast("Stopped tracking");
+    }
+    return;
+  }
+  if (e.target.closest("#toggle-history")) { state.showHistory = !state.showHistory; renderHistory(); return; }
+  const sold = e.target.closest("[data-sold]");
+  if (sold) {
+    const key = sold.dataset.sold;
+    const signal = (state.signals || []).find((s) => s.position.key === key);
+    const suggested = signal && signal.price_usd ? signal.price_usd : 0;
+    const answer = prompt(
+      "What price did you sell at?\n\nLeave the suggested value to use the last live price, or type your actual fill.",
+      suggested ? String(suggested) : "");
+    if (answer === null) return;
+    const price = Number(String(answer).replace(/[$,\s]/g, ""));
+    if (!(price > 0)) { toast("Need a sell price above zero to log the result", "bad"); return; }
+    const record = closePosition(key, price);
+    if (!record) return;
+    renderBadges();
+    state.posExpandedKey = null;
+    state.signals = (state.signals || []).filter((s) => s.position.key !== key);
+    renderSignals();
+    toast(`${record.symbol} logged: ${record.pnl_pct >= 0 ? "+" : ""}${record.pnl_pct.toFixed(1)}% (${record.pnl_usd >= 0 ? "+" : "−"}$${Math.abs(record.pnl_usd).toFixed(2)})`,
+          record.pnl_usd >= 0 ? "good" : "bad");
+    return;
+  }
+  const saveNote = e.target.closest("[data-save-note]");
+  if (saveNote) {
+    const positions = loadPositions();
+    const p = positions[saveNote.dataset.saveNote];
+    if (p) {
+      p.note = $("#note-input").value.trim();
+      savePositions(positions);
+      toast("Note saved", "good");
+    }
+    return;
+  }
+  const open = e.target.closest("[data-open-url]");
+  if (open) {
+    openUrl(open.dataset.openUrl);
+    return;
+  }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+    return;
+  }
+  const row = e.target.closest("tr.row[data-poskey]");
+  if (row && !e.target.closest("a, input, button")) {
+    const key = row.dataset.poskey;
+    state.posExpandedKey = state.posExpandedKey === key ? null : key;
+    renderSignals();
+  }
+});
+
+/* Watchlist area. */
+$("#view-watch").addEventListener("click", (e) => {
+  const star = e.target.closest("[data-star]");
+  if (star) { toggleWatch(star.dataset.star); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
+  const buy = e.target.closest("[data-watch-buy]");
+  if (buy) {
+    const w = loadWatchlist()[buy.dataset.watchBuy];
+    if (w) openManualBuy(w.chain, w.pair_address);
+  }
+});
+
+/* ---------- buy dialog ---------- */
+
+let pendingBuy = null;
+
+function suggestedSize() {
+  const sl = Math.abs(CONFIG.sell_rules.stop_loss_pct);
+  if (!(PREFS.bankroll > 0) || !(sl > 0)) return 0;
+  // Size so that hitting the stop loss costs risk_pct of the bankroll.
+  return (PREFS.bankroll * (PREFS.risk_pct / 100)) / (sl / 100);
+}
+
+function findCandidate(key) {
+  return state.passing.find((x) => candidateKey(x) === key)
+    || state.lookupExtras.find((x) => candidateKey(x) === key);
+}
+
+function openBuyDialog(key) {
+  const c = findCandidate(key);
+  if (!c) return;
+  pendingBuy = c;
+  $("#buy-hint").textContent = `${c.symbol} on ${c.chain} — current price ${fmtPrice(c.price_usd).replace(/^\$/, "$")}`;
+  $("#buy-amount").value = "";
+  $("#buy-price").value = "";
+  $("#buy-note").value = "";
+  const size = suggestedSize();
+  $("#buy-suggest").innerHTML = size > 0
+    ? `Suggested size: <b>$${size.toFixed(2)}</b> — risks ${PREFS.risk_pct}% of your $${PREFS.bankroll.toLocaleString()} bankroll if the ${CONFIG.sell_rules.stop_loss_pct}% stop hits.
+       <button class="small ghost" id="buy-use-suggest" type="button">Use it</button>`
+    : `Tip: set your bankroll in Settings → Position sizing to get a suggested size here.`;
+  const use = $("#buy-use-suggest");
+  if (use) use.addEventListener("click", () => { $("#buy-amount").value = size.toFixed(2); });
+  openDialog($("#dlg-buy"));
+  $("#buy-amount").focus();
+}
+
+$("#buy-save").addEventListener("click", () => {
+  const amount = Number($("#buy-amount").value);
+  if (!(amount > 0)) { toast("Enter how much you put in, in dollars", "bad"); return; }
+  addPosition(pendingBuy, amount, Number($("#buy-price").value) || 0, $("#buy-note").value);
+  closeDialog($("#dlg-buy"));
+  renderBadges();
+  if (state.expandedKey) renderResults();
+  toast(`Tracking ${pendingBuy.symbol} — see the Positions tab`, "good");
+});
+
+/* ---------- look up any coin ----------
+   Discovery can never be exhaustive, so this is the escape hatch: anything
+   you can see in FOMO can be pasted here and scored on demand. */
+
+async function runLookup() {
+  const raw = $("#lookup-q").value.trim();
+  if (!raw) return;
+  const target = $("#lookup-results");
+  const btn = $("#lookup-go");
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  target.innerHTML = `<div class="feed-err">Searching every chain…</div>`;
+
+  // A pasted DexScreener link goes straight to that pair.
+  const link = /dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i.exec(raw);
+  let found = [];
+  try {
+    if (link) {
+      const c = await fetchPair(link[1].toLowerCase(), link[2]);
+      if (c) found = [c];
+    } else {
+      const payload = await getJson(`${API}/latest/dex/search?q=${encodeURIComponent(raw)}`);
+      found = pairsFrom(payload).map(toCandidate)
+        .sort((a, b) => b.liquidity_usd - a.liquidity_usd)
+        .slice(0, 8);
+    }
+  } catch (err) {
+    found = [];
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Search";
+
+  if (!found.length) {
+    target.innerHTML = `<div class="feed-err">Nothing found for that. Check the spelling, or paste the
+      token's contract address from FOMO — that always matches exactly.</div>`;
+    return;
+  }
+
+  // Everything found is scored the same way the scanner scores its own results.
+  target.innerHTML = found.map((c) => {
+    const reasons = applyFilters(c);
+    const key = candidateKey(c);
+    let verdict;
+    if (reasons.length) {
+      verdict = `<span class="flag" style="cursor:default">fails filters</span>
+        <span style="color:var(--faint); font-size:12px">${escapeHtml(reasons[0])}</span>`;
+    } else {
+      scoreCandidate(c);
+      verdict = `<span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>`;
+    }
+    // Stash it so the buy/star buttons can find it by key like any scan result.
+    if (!state.passing.some((x) => candidateKey(x) === key)) state.lookupExtras.push(c);
+    return `<div class="feed-item">
+      <div class="sym">${escapeHtml(c.symbol)} ${verdict}</div>
+      <div class="feed-meta">
+        <span>${escapeHtml(c.chain)}</span><span>${fmtPrice(c.price_usd)}</span>
+        <span>${fmtCompact(c.liquidity_usd)} liq</span><span>${fmtCompact(c.volume_h24)} 24h vol</span>
+        ${fmtPct(c.price_change_h1)}
+      </div>
+      <div class="feed-meta" style="margin-top:5px">
+        <button class="small" data-copy="${escapeHtml(c.token_address)}">Copy address</button>
+        <button class="small" data-lookup-buy="${escapeHtml(key)}">I bought this</button>
+        <button class="small ghost" data-open-url="${escapeHtml(c.url)}">Chart ↗</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+$("#btn-group").addEventListener("click", () => {
+  PREFS.grouped = !PREFS.grouped;
+  savePrefs();
+  $("#btn-group").textContent = PREFS.grouped ? "Grouped by buy type" : "One flat list";
+  renderResults();
+});
+
+$("#btn-lookup").addEventListener("click", () => {
+  $("#lookup-q").value = "";
+  $("#lookup-results").innerHTML = "";
+  openDialog($("#dlg-lookup"));
+  $("#lookup-q").focus();
+});
+$("#lookup-go").addEventListener("click", runLookup);
+$("#lookup-q").addEventListener("keydown", (e) => { if (e.key === "Enter") runLookup(); });
+
+$("#dlg-lookup").addEventListener("click", async (e) => {
+  const buy = e.target.closest("[data-lookup-buy]");
+  if (buy) { closeDialog($("#dlg-lookup")); openBuyDialog(buy.dataset.lookupBuy); return; }
+  const open = e.target.closest("[data-open-url]");
+  if (open) { openUrl(open.dataset.openUrl); return; }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Copied to clipboard" : "Couldn't copy — select it manually", "good");
+  }
+});
+
+/* ---------- manual add dialog ---------- */
+
+function openManualBuy(chain, pair) {
+  $("#man-link").value = chain && pair ? `https://dexscreener.com/${chain}/${pair}` : "";
+  $("#man-amount").value = "";
+  $("#man-price").value = "";
+  openDialog($("#dlg-manual"));
+  (chain ? $("#man-amount") : $("#man-link")).focus();
+}
+
+$("#btn-add-manual").addEventListener("click", () => openManualBuy());
+
+$("#man-save").addEventListener("click", async () => {
+  const match = /dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i.exec($("#man-link").value.trim());
+  if (!match) { toast("That doesn't look like a DexScreener link", "bad"); return; }
+  const amount = Number($("#man-amount").value);
+  if (!(amount > 0)) { toast("Enter how much you put in, in dollars", "bad"); return; }
+  const btn = $("#man-save");
+  btn.disabled = true;
+  btn.textContent = "Looking up…";
+  const candidate = await fetchPair(match[1].toLowerCase(), match[2]);
+  btn.disabled = false;
+  btn.textContent = "Add";
+  if (!candidate) { toast("Couldn't find that pair — check the link and your connection", "bad"); return; }
+  addPosition(candidate, amount, Number($("#man-price").value) || 0, "");
+  closeDialog($("#dlg-manual"));
+  renderBadges();
+  switchTab("positions");
+  doCheck(true);
+  toast(`Tracking ${candidate.symbol}`, "good");
+});
+
+/* ---------- import / export ---------- */
+
+$("#btn-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(loadPositions(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "positions.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("#btn-import").addEventListener("click", () => $("#import-file").click());
+
+$("#import-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    const positions = loadPositions();
+    let added = 0;
+    for (const [key, p] of Object.entries(parsed || {})) {
+      if (p && typeof p === "object" && p.key && p.pair_address && Number(p.amount_usd) > 0) {
+        positions[key] = p;
+        added++;
+      }
+    }
+    if (!added) { toast("No valid positions found in that file", "bad"); return; }
+    savePositions(positions);
+    renderBadges();
+    state.signals = null;
+    renderSignals();
+    toast(`Imported ${added} position${added === 1 ? "" : "s"}`, "good");
+  } catch (err) {
+    toast("Couldn't read that file — is it the exported positions.json?", "bad");
+  }
+});
+
+/* ---------- settings ---------- */
+
+function numOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function fillSettings() {
+  $("#set-chains").value = CONFIG.discovery.chains.join(", ");
+  $("#set-terms").value = CONFIG.discovery.search_terms.join(", ");
+  $("#set-minliq").value = CONFIG.filters.min_liquidity_usd;
+  $("#set-minvol").value = CONFIG.filters.min_volume_h24_usd;
+  $("#set-minage").value = CONFIG.filters.min_age_minutes;
+  $("#set-maxage").value = CONFIG.filters.max_age_days;
+  $("#set-fdv").value = CONFIG.filters.max_fdv_to_liquidity_ratio;
+  $("#set-buyratio").value = Math.round(CONFIG.filters.min_buy_ratio_h1 * 100);
+  $("#set-xurl").value = PREFS.xUrl || "";
+  $("#set-xkey").value = PREFS.xKey || "";
+  $("#set-bankroll").value = PREFS.bankroll || "";
+  $("#set-risk").value = PREFS.risk_pct;
+  $("#set-tp").value = CONFIG.sell_rules.take_profit_pct;
+  $("#set-sl").value = CONFIG.sell_rules.stop_loss_pct;
+  $("#set-trail").value = CONFIG.sell_rules.trailing_stop_pct;
+  $("#set-liqdrop").value = CONFIG.sell_rules.liquidity_drop_pct;
+}
+
+$("#btn-settings").addEventListener("click", () => { fillSettings(); openDialog($("#dlg-settings")); });
+
+$("#set-save").addEventListener("click", () => {
+  const chains = $("#set-chains").value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!chains.length) { toast("Enter at least one chain, e.g. solana", "bad"); return; }
+  const terms = $("#set-terms").value.split(",").map((s) => s.trim()).filter(Boolean);
+  CONFIG.discovery.chains = chains;
+  CONFIG.discovery.search_terms = terms.length ? terms : DEFAULTS.discovery.search_terms;
+  CONFIG.filters.min_liquidity_usd = numOr($("#set-minliq").value, DEFAULTS.filters.min_liquidity_usd);
+  CONFIG.filters.min_volume_h24_usd = numOr($("#set-minvol").value, DEFAULTS.filters.min_volume_h24_usd);
+  CONFIG.filters.min_age_minutes = numOr($("#set-minage").value, DEFAULTS.filters.min_age_minutes);
+  CONFIG.filters.max_age_days = numOr($("#set-maxage").value, DEFAULTS.filters.max_age_days);
+  CONFIG.filters.max_fdv_to_liquidity_ratio = numOr($("#set-fdv").value, DEFAULTS.filters.max_fdv_to_liquidity_ratio);
+  CONFIG.filters.min_buy_ratio_h1 = clamp(numOr($("#set-buyratio").value, 45) / 100);
+  CONFIG.sell_rules.take_profit_pct = numOr($("#set-tp").value, DEFAULTS.sell_rules.take_profit_pct);
+  CONFIG.sell_rules.stop_loss_pct = numOr($("#set-sl").value, DEFAULTS.sell_rules.stop_loss_pct);
+  CONFIG.sell_rules.trailing_stop_pct = numOr($("#set-trail").value, DEFAULTS.sell_rules.trailing_stop_pct);
+  CONFIG.sell_rules.liquidity_drop_pct = numOr($("#set-liqdrop").value, DEFAULTS.sell_rules.liquidity_drop_pct);
+  PREFS.xUrl = $("#set-xurl").value.trim();
+  PREFS.xKey = $("#set-xkey").value.trim();
+  PREFS.bankroll = Math.max(0, numOr($("#set-bankroll").value, 0));
+  PREFS.risk_pct = Math.min(100, Math.max(0.1, numOr($("#set-risk").value, 1)));
+  savePrefs();
+  writeStore(STORE_CONFIG, CONFIG);
+  closeDialog($("#dlg-settings"));
+  toast("Saved — scan settings apply on the next scan", "good");
+});
+
+$("#set-reset").addEventListener("click", () => {
+  CONFIG = JSON.parse(JSON.stringify(DEFAULTS));
+  writeStore(STORE_CONFIG, CONFIG);
+  fillSettings();
+  toast("Settings reset to defaults");
+});
+
+/* ---------- dialogs: open/close that works without showModal support ---------- */
+
+function openDialog(dlg) {
+  if (typeof dlg.showModal === "function") {
+    dlg.showModal();
+  } else {
+    dlg.classList.add("fallback");
+    dlg.setAttribute("open", "");
+  }
+}
+
+function closeDialog(dlg) {
+  if (dlg.classList.contains("fallback") || typeof dlg.close !== "function") {
+    dlg.removeAttribute("open");
+  } else if (dlg.open) {
+    dlg.close();
+  }
+}
+
+$$("dialog").forEach((dlg) => {
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) closeDialog(dlg); });
+  dlg.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", () => closeDialog(dlg)));
+});
+
+/* ---------- keyboard ---------- */
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { $$("dialog[open]").forEach(closeDialog); return; }
+  if (e.target.matches("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "/") { e.preventDefault(); switchTab("find"); $("#search").focus(); }
+  else if (e.key === "1") switchTab("find");
+  else if (e.key === "2") switchTab("watch");
+  else if (e.key === "3") switchTab("positions");
+  else if (e.key === "4") switchTab("feed");
+  else if (e.key === "5") switchTab("learn");
+});
+
+/* ---------- auto refresh ---------- */
+
+let autoScanTimer = null;
+let autoCheckTimer = null;
+let nextScanAt = 0;
+
+/* setTimeout chains rather than intervals: each run re-arms after it finishes,
+   so a slow network can't stack overlapping scans, and the countdown is real. */
+function scheduleAutoScan() {
+  clearTimeout(autoScanTimer);
+  if (!PREFS.autoScan) { nextScanAt = 0; return; }
+  nextScanAt = Date.now() + 120000;
+  autoScanTimer = setTimeout(async () => {
+    if (!document.hidden) await doScan();
+    scheduleAutoScan();
+  }, 120000);
+}
+
+function scheduleAutoCheck() {
+  clearTimeout(autoCheckTimer);
+  if (!PREFS.autoCheck) return;
+  autoCheckTimer = setTimeout(async () => {
+    if (!document.hidden) await doCheck(true);
+    scheduleAutoCheck();
+  }, 30000);
+}
+
+let repriceTimer = null;
+
+/* Prices refresh on a short cycle independent of the full rescan, so the
+   numbers on screen stay close to live between scans. */
+function scheduleReprice() {
+  clearInterval(repriceTimer);
+  if (!PREFS.autoScan) return;   // the same switch governs live pricing
+  repriceTimer = setInterval(repriceVisible, 20000);
+}
+
+$("#auto-scan").addEventListener("change", (e) => { PREFS.autoScan = e.target.checked; savePrefs(); scheduleAutoScan(); scheduleReprice(); renderScanAge(); });
+$("#auto-check").addEventListener("change", (e) => { PREFS.autoCheck = e.target.checked; savePrefs(); scheduleAutoCheck(); });
+
+/* ---------- init ---------- */
+
+/* Anything that breaks from here on must be SEEN, not swallowed: while the
+   boot banner is still up it gets the error text; afterwards errors toast. */
+function reportError(message) {
+  const slot = document.getElementById("boot-error");
+  if (slot) { slot.textContent = message; return; }
+  try { toast("Something went wrong: " + message, "bad"); } catch (err) { /* nothing left to report to */ }
+}
+window.addEventListener("error", (e) => reportError(e.message || String(e.error || "unknown error")));
+window.addEventListener("unhandledrejection", (e) => reportError(String((e.reason && e.reason.message) || e.reason || "unknown error")));
+
+try {
+  hydrateScan();
+  renderBadges();
+  renderResults();
+  $("#auto-scan").checked = !!PREFS.autoScan;
+  $("#auto-check").checked = !!PREFS.autoCheck;
+  $("#notify-toggle").checked = !!PREFS.notify;
+  $("#btn-group").textContent = PREFS.grouped ? "Grouped by buy type" : "One flat list";
+  $("#feed-auto").checked = !!PREFS.feedAuto;
+  $("#feed-sort").value = PREFS.feedSort || "smart";
+  $("#notify-toggle").addEventListener("change", (e) => enableNotifications(e.target.checked));
+  scheduleFeedAuto();
+  scheduleAutoScan();
+  scheduleAutoCheck();
+  scheduleReprice();
+  setInterval(renderScanAge, 1000);
+  if (PREFS.tab && PREFS.tab !== "find") switchTab(PREFS.tab);
+
+  // The app is alive — take down the "didn't start" banner.
+  const bootCheck = document.getElementById("boot-check");
+  if (bootCheck) bootCheck.remove();
+
+  // Auto-search on open: scan immediately, and price any tracked positions.
+  doScan();
+  if (Object.keys(loadPositions()).length) doCheck(true);
+} catch (err) {
+  reportError((err && err.stack) || String(err));
+  throw err;
+}
+</script>
+</body>
+</html>
