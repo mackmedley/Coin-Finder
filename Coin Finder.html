@@ -379,8 +379,99 @@
     gap: 8px;
   }
   .feed-sec h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); font-size: 11.5px; }
-  .feed-item { padding: 8px 0; }
+  .feed-item { padding: 13px 0; }
   .feed-item + .feed-item { border-top: 1px solid var(--line-soft); }
+
+  .fi-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 5px; }
+  .kind {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .kind.k-news { color: var(--accent); border-color: rgba(57,135,229,0.4); }
+  .kind.k-reddit { color: var(--serious); border-color: rgba(236,131,90,0.4); }
+  .kind.k-tweet { color: var(--text); }
+  .kind.k-pool { color: var(--good); border-color: rgba(63,185,80,0.4); }
+  .kind.k-new { color: var(--warn); border-color: rgba(250,178,25,0.4); }
+  .kind.k-trend { color: var(--accent); }
+  .kind.k-promo { color: var(--faint); }
+
+  .fi-src { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .fi-time { font-size: 11.5px; color: var(--faint); }
+  .narr-tag {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(57,135,229,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(57,135,229,0.28);
+  }
+
+  .fi-title {
+    display: block;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .fi-title:hover { color: var(--accent); }
+  .fi-desc { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .fi-facts { margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fi-facts b { color: var(--text); font-weight: 600; }
+  .fi-facts .dot { margin: 0 7px; color: var(--line); }
+  .fi-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .fi-actions button { font-size: 11.5px; padding: 3px 9px; }
+
+  .fi-coins { margin-top: 7px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fi-coins-label { font-size: 11px; color: var(--faint); }
+  .coin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .coin-chip:hover { border-color: var(--accent); }
+  .coin-chip .score { min-width: 0; padding: 0 5px; font-size: 11px; }
+
+  /* narratives */
+  .narr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 8px; }
+  .narr {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .narr.on { border-color: var(--accent); }
+  .narr-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .narr-name { font-weight: 600; font-size: 13.5px; color: var(--text); }
+  .narr-heat { font-size: 11px; color: var(--accent); white-space: nowrap; }
+  .narr-move { font-size: 11.5px; color: var(--faint); margin-top: 3px; }
+  .narr-move.pos { color: var(--good); }
+  .narr-move.neg { color: #f85149; }
   .feed-item .feed-meta button { font-size: 11.5px; padding: 3px 9px; }
   #feed-social { position: sticky; top: 74px; }
   @media (max-width: 860px) { #feed-social { position: static; } }
@@ -577,6 +668,7 @@
       <div class="chips" id="feed-chips"></div>
     </div>
     <div id="feed-status"></div>
+    <div id="feed-narratives"></div>
     <div class="feed-cols">
       <div id="feed-stream"></div>
       <div id="feed-social"></div>
@@ -2147,7 +2239,7 @@ function renderWatchlist(priced) {
 
 const FEED = {
   loadedAt: 0, loading: false, mood: null, items: [], failed: [], ok: 0,
-  filter: "all", query: "",
+  filter: "all", query: "", narrative: "",
 };
 
 const MEME_RE = /meme|doge|shiba?|pepe|bonk|\bwif\b|floki|\binu\b|frog coin|moon ?shot|pump\.?fun|degen|fartcoin|\bcat coin\b|trump coin|\bmog\b|brett|popcat/i;
@@ -2164,6 +2256,79 @@ function xSearchUrl(term) {
 }
 
 function feedTime(item) { return item.time || 0; }
+
+/* ---- narratives ----
+ * Meme coins don't trade on fundamentals, they trade on themes. Knowing
+ * that dog coins are hot and frog coins are cold this afternoon is the
+ * single most useful thing a feed can tell you, so every item is tagged
+ * and the themes are ranked by how loudly they're being talked about. */
+const NARRATIVES = [
+  ["dogs", "Dog coins", /\b(doge|dogecoin|shib|shiba|inu|bonk|wif|dogwifhat|floki|dog\b|puppy|corgi)/i],
+  ["frogs", "Frogs", /\b(pepe|frog|brett|apu|wojak)/i],
+  ["cats", "Cats", /\b(popcat|cat\b|cats\b|meow|mew\b|kitty|paw)/i],
+  ["politics", "Politics", /\b(trump|maga|biden|potus|election|president|政治|政)/i],
+  ["ai", "AI coins", /\b(ai\b|artificial intelligence|gpt|agent|bot\b|neural)/i],
+  ["celebrity", "Celebrity", /\b(elon|musk|kanye|drake|celebrity|influencer)/i],
+  ["food", "Food", /\b(banana|pizza|burger|taco|coffee|beer|milk|cheese)/i],
+  ["gaming", "Gaming", /\b(game|gaming|play2earn|p2e|nft game|metaverse)/i],
+  ["launchpad", "New launches", /\b(pump\.?fun|launchpad|fair launch|presale|bonding curve|just launched)/i],
+  ["etf", "ETFs & regulation", /\b(etf|sec\b|regulat|lawsuit|approval|ruling)/i],
+];
+
+function narrativesFor(text) {
+  const hay = String(text || "");
+  const hits = [];
+  for (const [id, label, re] of NARRATIVES) if (re.test(hay)) hits.push({ id, label });
+  return hits;
+}
+
+/** Rank themes by how much of the feed is talking about them. */
+function rankNarratives() {
+  const counts = new Map();
+  for (const item of FEED.items) {
+    const text = `${item.title} ${item.description || ""} ${item.source}`;
+    for (const n of narrativesFor(text)) {
+      if (!counts.has(n.id)) counts.set(n.id, { id: n.id, label: n.label, items: 0, coins: [] });
+      counts.get(n.id).items++;
+    }
+  }
+  // Coins from the latest scan that belong to each theme, best first.
+  for (const c of state.passing) {
+    for (const n of narrativesFor(`${c.symbol} ${c.name}`)) {
+      if (!counts.has(n.id)) counts.set(n.id, { id: n.id, label: n.label, items: 0, coins: [] });
+      counts.get(n.id).coins.push(c);
+    }
+  }
+  return [...counts.values()]
+    .map((n) => {
+      n.coins.sort((a, b) => b.score - a.score);
+      // Average 6h move of this theme's coins: is the money agreeing with the talk?
+      const moves = n.coins.map((c) => c.price_change_h6).filter((v) => Number.isFinite(v));
+      n.move = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
+      n.heat = n.items + n.coins.length * 2;
+      return n;
+    })
+    .filter((n) => n.heat > 1)
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, 6);
+}
+
+/** Coins in the current scan that a feed item actually names. */
+function coinsMentioned(item) {
+  const hay = ` ${item.title} ${item.description || ""} `.toUpperCase();
+  const seen = new Set();
+  const out = [];
+  for (const c of state.passing) {
+    const sym = String(c.symbol || "").toUpperCase();
+    if (sym.length < 3 || seen.has(sym)) continue;
+    if (hay.indexOf(` ${sym} `) >= 0 || hay.indexOf(`$${sym}`) >= 0 || hay.indexOf(`${sym}/`) >= 0) {
+      seen.add(sym);
+      out.push(c);
+    }
+    if (out.length >= 2) break;
+  }
+  return out;
+}
 
 /* ---- source parsers: each returns an array of unified items ---- */
 
@@ -2419,6 +2584,10 @@ function visibleFeed() {
   const q = FEED.query.trim().toLowerCase();
   let rows = FEED.items;
   if (FEED.filter !== "all") rows = rows.filter((i) => i.kind === FEED.filter);
+  if (FEED.narrative) {
+    rows = rows.filter((i) => narrativesFor(`${i.title} ${i.description || ""}`)
+      .some((n) => n.id === FEED.narrative));
+  }
   if (q) rows = rows.filter((i) => (i.title + " " + i.source + " " + (i.description || "")).toLowerCase().includes(q));
   const sort = PREFS.feedSort || "smart";
   const sorters = {
@@ -2433,35 +2602,58 @@ function visibleFeed() {
   return rows.slice().sort(sorters[sort] || sorters.smart).slice(0, 80);
 }
 
+const KIND_LABEL = {
+  news: ["News", "k-news"], reddit: ["Reddit", "k-reddit"], tweet: ["X", "k-tweet"],
+  trending: ["Trending", "k-trend"], trending_pool: ["Hot pool", "k-pool"],
+  newpool: ["New pool", "k-new"], promo: ["Promoted", "k-promo"],
+};
+
 function feedItemHtml(item) {
-  const bits = [];
-  if (item.meme && item.kind === "news") bits.push(`<span class="flag" style="cursor:default">meme</span>`);
-  bits.push(`<span>${escapeHtml(item.source)}</span>`);
-  if (item.score) bits.push(`<span>▲ ${item.score}</span>`);
-  if (item.volume) bits.push(`<span>${fmtCompact(item.volume)} 24h vol</span>`);
-  if (item.liquidity) bits.push(`<span>${fmtCompact(item.liquidity)} liq</span>`);
-  if (item.change_h1) bits.push(fmtPct(item.change_h1));
-  if (item.amount) bits.push(`<span>$${Math.round(item.amount)} spent</span>`);
-  if (item.time) bits.push(`<span>${relTime(item.time)}</span>`);
+  const [label, cls] = KIND_LABEL[item.kind] || ["Item", ""];
+  const tags = narrativesFor(`${item.title} ${item.description || ""}`)
+    .slice(0, 2)
+    .map((n) => `<span class="narr-tag">${escapeHtml(n.label)}</span>`).join("");
+
+  // Facts line — only the numbers this kind of item actually has.
+  const facts = [];
+  if (item.volume) facts.push(`<b>${fmtCompact(item.volume)}</b> 24h vol`);
+  if (item.liquidity) facts.push(`<b>${fmtCompact(item.liquidity)}</b> liquidity`);
+  if (Number.isFinite(item.change_h1) && item.change_h1) facts.push(`${fmtPct(item.change_h1)} 1h`);
+  if (item.score) facts.push(`▲ ${item.score}`);
+  if (item.amount) facts.push(`<b>$${Math.round(item.amount)}</b> spent promoting`);
+
+  // Coins from the current scan that this item names — the actionable bridge.
+  const mentioned = coinsMentioned(item).map((c) => `
+    <button class="coin-chip" data-feed-score="${escapeHtml(c.chain + ":" + c.pair_address)}"
+      title="Score ${escapeHtml(c.symbol)} with the scanner">
+      ${escapeHtml(c.symbol)} <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+    </button>`).join("");
 
   const actions = [];
   if (item.chain && item.pair) {
     actions.push(`<button class="small" data-feed-score="${escapeHtml(item.chain + ":" + item.pair)}">Score it</button>`);
   }
   const xTerm = item.token || item.symbol || (item.title || "").split("/")[0].trim();
-  if (xTerm && item.kind !== "news" && item.kind !== "reddit") {
+  if (xTerm && item.kind !== "news" && item.kind !== "reddit" && item.kind !== "tweet") {
     actions.push(`<button class="small ghost" data-open-url="${escapeHtml(xSearchUrl(xTerm))}">Search X ↗</button>`);
   }
   if (item.token) {
     actions.push(`<button class="small ghost" data-copy="${escapeHtml(item.token)}">Copy address</button>`);
   }
 
-  return `<div class="feed-item">
-    <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-    ${item.description ? `<div class="feed-meta">${escapeHtml(item.description.slice(0, 110))}</div>` : ""}
-    <div class="feed-meta">${bits.join("")}</div>
-    ${actions.length ? `<div class="feed-meta" style="margin-top:5px">${actions.join("")}</div>` : ""}
-  </div>`;
+  return `<article class="feed-item">
+    <div class="fi-head">
+      <span class="kind ${cls}">${escapeHtml(label)}</span>
+      <span class="fi-src">${escapeHtml(item.source)}</span>
+      ${item.time ? `<span class="fi-time">${escapeHtml(relTime(item.time))}</span>` : ""}
+      ${tags}
+    </div>
+    <a class="fi-title" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+    ${item.description ? `<p class="fi-desc">${escapeHtml(item.description.slice(0, 140))}</p>` : ""}
+    ${facts.length ? `<div class="fi-facts">${facts.join('<span class="dot">·</span>')}</div>` : ""}
+    ${mentioned ? `<div class="fi-coins"><span class="fi-coins-label">In your scan:</span>${mentioned}</div>` : ""}
+    ${actions.length ? `<div class="fi-actions">${actions.join("")}</div>` : ""}
+  </article>`;
 }
 
 function renderFeed(loading) {
@@ -2503,6 +2695,37 @@ function renderFeed(loading) {
       <span style="color:var(--faint)">unavailable right now: ${escapeHtml(FEED.failed.join(", "))}</span></p></div>`;
   } else {
     status.innerHTML = "";
+  }
+
+  // Narratives — what the market is actually talking about
+  const narrBox = $("#feed-narratives");
+  const themes = FEED.loadedAt ? rankNarratives() : [];
+  if (themes.length) {
+    narrBox.innerHTML = `
+      <div class="feed-sec">
+        <h2>Narratives right now <span class="sub">themes ranked by how much of the feed is talking about them</span></h2>
+        <div class="narr-grid">
+          ${themes.map((n) => {
+            const coins = n.coins.slice(0, 3).map((c) => `
+              <button class="coin-chip" data-feed-score="${escapeHtml(c.chain + ":" + c.pair_address)}">
+                ${escapeHtml(c.symbol)} <span class="score ${scoreClass(c.score)}">${c.score.toFixed(0)}</span>
+              </button>`).join("");
+            const moveText = n.move === null ? "no coins in your scan yet"
+              : `coins ${n.move >= 0 ? "up" : "down"} ${Math.abs(n.move).toFixed(0)}% avg over 6h`;
+            return `<div class="narr ${FEED.narrative === n.id ? "on" : ""}">
+              <button class="narr-head" data-narrative="${escapeHtml(n.id)}">
+                <span class="narr-name">${escapeHtml(n.label)}</span>
+                <span class="narr-heat">${n.items} mention${n.items === 1 ? "" : "s"}</span>
+              </button>
+              <div class="narr-move ${n.move === null ? "" : (n.move >= 0 ? "pos" : "neg")}">${escapeHtml(moveText)}</div>
+              ${coins ? `<div class="fi-coins">${coins}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+        ${FEED.narrative ? `<button class="section-toggle" data-narrative="">▾ Clear theme filter</button>` : ""}
+      </div>`;
+  } else {
+    narrBox.innerHTML = "";
   }
 
   // Stream
@@ -2604,6 +2827,13 @@ $("#feed-search").addEventListener("input", (() => {
 $("#view-feed").addEventListener("click", async (e) => {
   const chip = e.target.closest("[data-feed-filter]");
   if (chip) { FEED.filter = chip.dataset.feedFilter; renderFeed(); return; }
+  const narr = e.target.closest("[data-narrative]");
+  if (narr) {
+    const id = narr.dataset.narrative;
+    FEED.narrative = (FEED.narrative === id) ? "" : id;
+    renderFeed();
+    return;
+  }
   const scoreBtn = e.target.closest("[data-feed-score]");
   if (scoreBtn) { scoreFromFeed(scoreBtn.dataset.feedScore); return; }
   const open = e.target.closest("[data-open-url]");
@@ -2742,6 +2972,16 @@ function renderLearn() {
     <p>With no source set, the Feed still <b>hands off</b>: the Social panel and every coin's
        <b>Search X</b> button open X's own live search for that ticker or contract address — the
        search you'd type yourself, one tap away.</p>
+    <p><b>Narratives</b> sit above the stream. Meme coins don't trade on fundamentals, they trade on
+       themes — dogs, frogs, cats, politics, AI — and the money rotates between them constantly. Every
+       feed item is tagged, the themes are ranked by how much of the feed is discussing them, and each
+       shows the average 6h move of the coins in <i>your scan</i> belonging to it. That last number is
+       the honest one: it tells you whether the money agrees with the talk. A theme with loud mentions
+       and falling coins is a crowd arriving late; quiet mentions with rising coins is the opposite.
+       Tap any theme to filter the whole feed to it.</p>
+    <p>Where a story names a coin from your latest scan, that coin appears under it as a chip with its
+       live score — tap it to run the full scanner on the spot. That's the bridge from "people are
+       talking about this" to "here's what the numbers say".</p>
     <p>Treat all of it as <b>where to look, never what to buy</b>. Hype is how exit liquidity gets
        recruited: by the time something is loud everywhere, you may be the buyer someone was
        waiting for. Any coin in the feed has a <b>Score it</b> button that runs it through the
