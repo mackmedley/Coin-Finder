@@ -11,6 +11,30 @@ It **places no orders and holds no funds**. There is no wallet, no private key, 
 
 ---
 
+## Use it on your phone
+
+`docs/` is a self-contained web build of the same tool — one HTML file, no
+dependencies, no build step. It calls the DexScreener API straight from the
+browser and runs the identical filters, scoring, and sell rules as the CLI
+(ported to JS and verified against the Python implementation).
+
+Once GitHub Pages is serving this repo, the link is:
+
+**https://mackmedley.github.io/Coin-Finder/**
+
+Open it on your phone and use **Share → Add to Home Screen** to get it as an app
+icon with no browser chrome.
+
+To turn Pages on: repo **Settings → Pages → Source: Deploy from a branch →
+`main` / `/docs`** (the root `index.html` redirects to `docs/`, so `/ (root)`
+works too). It takes about a minute to go live after the first push.
+
+Positions and settings are stored in that browser's `localStorage` — they don't
+sync with `data/positions.json` on your machine, and nothing leaves the device.
+There is still no wallet, no key, and no order placement.
+
+---
+
 ## Install
 
 ```bash

@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coin Finder">
+<meta name="description" content="Meme coin screener and exit-signal tool. Ranks live DEX pairs and tells you when a mechanical exit rule fires.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Coin Finder</title>
+<style>
+  :root{
+    --bg:#0b0d12; --surface:#141822; --surface-2:#1c2130; --line:#252b3a;
+    --text:#e8ecf4; --muted:#8d97ad; --dim:#6a7387;
+    --accent:#5eead4; --good:#34d399; --warn:#fbbf24; --bad:#f87171; --urgent:#fb7185;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  }
+  a{color:var(--accent)}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(11,13,18,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px;flex:1}
+  header h1 span{color:var(--accent)}
+  .status{font-size:11px;color:var(--dim);text-align:right;line-height:1.3}
+
+  main{padding:14px 12px 24px;max-width:720px;margin:0 auto}
+  .view{display:none}
+  .view.active{display:block}
+
+  .bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+  .btn{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:11px 16px; border-radius:11px; font-weight:600; font-size:14px;
+    min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--accent);color:#07231f;border-color:transparent}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:8px 12px;min-height:38px;font-size:13px;border-radius:9px}
+  .btn:disabled{opacity:.5}
+  .grow{flex:1}
+
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); padding:14px; margin-bottom:10px;
+  }
+  .card.rank1{border-color:#2f6f63}
+
+  .row{display:flex;align-items:baseline;gap:8px}
+  .sym{font-size:18px;font-weight:700;letter-spacing:.2px}
+  .chain{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .score{
+    margin-left:auto; font-size:20px; font-weight:750; font-variant-numeric:tabular-nums;
+    color:var(--accent);
+  }
+  .rank{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;min-width:18px}
+  .name{color:var(--muted);font-size:12px;margin:2px 0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 6px;margin-bottom:10px}
+  .stat b{display:block;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums}
+  .stat i{display:block;font-style:normal;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+  .up{color:var(--good)} .down{color:var(--bad)}
+
+  .bars{display:grid;gap:5px;margin:10px 0}
+  .cmp{display:grid;grid-template-columns:74px 1fr 34px;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+  .track{display:block;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+  .fill{display:block;height:100%;min-width:2px;background:var(--accent);border-radius:3px}
+  .cmp em{font-style:normal;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  .flags{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 0}
+  .flag{font-size:11px;background:rgba(251,191,36,.12);color:var(--warn);border:1px solid rgba(251,191,36,.25);padding:3px 8px;border-radius:999px}
+
+  .actions{display:flex;gap:8px;margin-top:12px}
+  .actions .btn{flex:1}
+
+  .verdict{font-size:11px;font-weight:750;letter-spacing:.7px;padding:4px 9px;border-radius:999px;text-transform:uppercase}
+  .v-HOLD{background:rgba(141,151,173,.15);color:var(--muted)}
+  .v-TRIM{background:rgba(251,191,36,.15);color:var(--warn)}
+  .v-SELL{background:rgba(248,113,113,.15);color:var(--bad)}
+  .v-URGENT{background:var(--urgent);color:#2a0710}
+  .reasons{margin:10px 0 0;padding:0;list-style:none;font-size:13px;color:var(--muted)}
+  .reasons li{padding:3px 0 3px 12px;position:relative}
+  .reasons li:before{content:"";position:absolute;left:0;top:11px;width:4px;height:4px;border-radius:50%;background:var(--dim)}
+
+  .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
+  .empty b{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+  .error{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.07)}
+  .error b{color:var(--bad)}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .field input,.field select{
+    width:100%;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:10px;padding:11px 12px;min-height:44px;
+  }
+  .field .hint{font-size:11px;color:var(--dim);margin-top:4px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  fieldset{border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:0 0 12px;background:var(--surface)}
+  legend{font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.7px;padding:0 6px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);padding:9px 12px;border-radius:999px;font-size:13px}
+  .chip input{accent-color:var(--accent);width:16px;height:16px}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px;padding:6px 0}
+
+  .disclaimer{font-size:11px;color:var(--dim);line-height:1.6;margin-top:20px;padding:12px;border:1px dashed var(--line);border-radius:12px}
+
+  nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    display:grid;grid-template-columns:repeat(3,1fr);
+    background:rgba(20,24,34,.96);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    position:relative;
+    background:none;border:0;padding:11px 4px 12px;color:var(--dim);
+    font-size:11px;font-weight:600;letter-spacing:.3px;display:grid;gap:3px;justify-items:center;
+  }
+  nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  nav button.active{color:var(--accent)}
+  nav .badge{position:absolute;transform:translate(15px,-4px);background:var(--urgent);color:#2a0710;font-size:9px;font-weight:800;border-radius:999px;padding:1px 5px}
+
+  .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Coin<span>Finder</span></h1>
+  <div class="status" id="status"></div>
+</header>
+
+<main>
+  <!-- ───────────────────────────── SCAN ───────────────────────────── -->
+  <section class="view active" id="view-scan">
+    <div class="bar">
+      <button class="btn primary grow" id="scan-btn">Scan for buys</button>
+      <button class="btn ghost sm" id="scan-more" hidden>Show 10</button>
+    </div>
+    <div id="scan-out">
+      <div class="empty">
+        <b>Nothing scanned yet</b>
+        Pulls live DEX pairs, drops anything failing the hard filters, and ranks the rest 0–100.
+      </div>
+    </div>
+    <p class="disclaimer">
+      Not financial advice. The score ranks one scan's candidates against each other — it is not a
+      probability of profit. Most meme coins go to zero. The safety component is a heuristic and
+      cannot detect a honeypot, a live mint authority, or unlocked LP. Verify every token yourself.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── POSITIONS ─────────────────────────── -->
+  <section class="view" id="view-positions">
+    <div class="bar">
+      <button class="btn primary grow" id="check-btn">Check exits</button>
+      <label class="chip"><input type="checkbox" id="auto-refresh"> Auto&nbsp;2m</label>
+    </div>
+    <div id="positions-out"></div>
+
+    <fieldset>
+      <legend>Track a position</legend>
+      <div class="field">
+        <label for="t-url">DexScreener URL or chain:pair</label>
+        <input id="t-url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"
+               placeholder="https://dexscreener.com/solana/PAIR…">
+      </div>
+      <div class="two">
+        <div class="field">
+          <label for="t-amount">Amount (USD)</label>
+          <input id="t-amount" inputmode="decimal" placeholder="250">
+        </div>
+        <div class="field">
+          <label for="t-entry">Entry price (blank = live)</label>
+          <input id="t-entry" inputmode="decimal" placeholder="0.00012">
+        </div>
+      </div>
+      <button class="btn" id="track-btn" style="width:100%">Track it</button>
+    </fieldset>
+  </section>
+
+  <!-- ─────────────────────────── SETTINGS ─────────────────────────── -->
+  <section class="view" id="view-settings">
+    <fieldset>
+      <legend>Chains</legend>
+      <div class="chips" id="chain-chips"></div>
+      <div class="field" style="margin-top:12px">
+        <label for="s-terms">Extra search terms</label>
+        <input id="s-terms" autocapitalize="off" spellcheck="false" placeholder="pump, meme">
+        <div class="hint">Widens discovery past the paid-boost feed.</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Hard filters</legend>
+      <div class="two">
+        <div class="field"><label for="f-liq">Min liquidity $</label><input id="f-liq" inputmode="numeric"></div>
+        <div class="field"><label for="f-vol">Min 24h volume $</label><input id="f-vol" inputmode="numeric"></div>
+        <div class="field"><label for="f-minage">Min age (min)</label><input id="f-minage" inputmode="numeric"></div>
+        <div class="field"><label for="f-maxage">Max age (days)</label><input id="f-maxage" inputmode="numeric"></div>
+        <div class="field"><label for="f-fdv">Max FDV/liq ratio</label><input id="f-fdv" inputmode="numeric"></div>
+        <div class="field"><label for="f-buy">Min 1h buy ratio</label><input id="f-buy" inputmode="decimal"></div>
+      </div>
+      <div class="hint">A candidate failing any of these is dropped before scoring.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sell rules</legend>
+      <div class="two">
+        <div class="field"><label for="r-tp">Take profit %</label><input id="r-tp" inputmode="numeric"></div>
+        <div class="field"><label for="r-sl">Stop loss %</label><input id="r-sl" inputmode="numeric"></div>
+        <div class="field"><label for="r-ts">Trailing stop %</label><input id="r-ts" inputmode="numeric"></div>
+        <div class="field"><label for="r-ld">Liquidity drop %</label><input id="r-ld" inputmode="numeric"></div>
+      </div>
+      <div class="hint">A liquidity collapse outranks a profit target — a draining pool may not be exitable.</div>
+    </fieldset>
+
+    <details>
+      <summary>Scoring weights &amp; curves</summary>
+      <fieldset style="margin-top:10px">
+        <div class="two">
+          <div class="field"><label for="w-liquidity">Liquidity</label><input id="w-liquidity" inputmode="numeric"></div>
+          <div class="field"><label for="w-turnover">Turnover</label><input id="w-turnover" inputmode="numeric"></div>
+          <div class="field"><label for="w-momentum">Momentum</label><input id="w-momentum" inputmode="numeric"></div>
+          <div class="field"><label for="w-buy_pressure">Buy pressure</label><input id="w-buy_pressure" inputmode="numeric"></div>
+          <div class="field"><label for="w-age_fit">Age fit</label><input id="w-age_fit" inputmode="numeric"></div>
+          <div class="field"><label for="w-safety">Safety</label><input id="w-safety" inputmode="numeric"></div>
+          <div class="field"><label for="c-liqsat">Liquidity saturation $</label><input id="c-liqsat" inputmode="numeric"></div>
+          <div class="field"><label for="c-turnsat">Turnover saturation</label><input id="c-turnsat" inputmode="decimal"></div>
+          <div class="field"><label for="c-late">Late-pump 1h %</label><input id="c-late" inputmode="numeric"></div>
+          <div class="field"><label for="c-agelo">Age sweet spot from (h)</label><input id="c-agelo" inputmode="numeric"></div>
+          <div class="field"><label for="c-agehi">…to (h)</label><input id="c-agehi" inputmode="numeric"></div>
+        </div>
+        <div class="hint">Weights are normalized internally, so changing one never rescales the others.</div>
+      </fieldset>
+    </details>
+
+    <div class="bar">
+      <button class="btn primary grow" id="save-btn">Save settings</button>
+      <button class="btn ghost" id="reset-btn">Reset</button>
+    </div>
+    <p class="disclaimer">
+      Settings and tracked positions live in this browser only (localStorage). Nothing is uploaded,
+      there is no account, and no wallet or key is ever involved. Clearing site data wipes them.
+    </p>
+  </section>
+</main>
+
+<nav>
+  <button data-view="scan" class="active">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    Scan
+  </button>
+  <button data-view="positions">
+    <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 5-7 4 4"/><path d="M3 21h18"/></svg>
+    Positions<span class="badge" id="pos-badge" hidden></span>
+  </button>
+  <button data-view="settings">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+    Settings
+  </button>
+</nav>
+
+<script>
+"use strict";
+
+/* ───────────────────────────── config ───────────────────────────── */
+/* Mirrors config/default.yaml. Overrides are deep-merged over this, so a
+   partial saved config never loses keys added by a later version. */
+const DEFAULTS = {
+  discovery: {
+    chains: ["solana", "base", "ethereum", "bsc"],
+    search_terms: ["pump", "meme"],
+    max_candidates: 150
+  },
+  filters: {
+    min_liquidity_usd: 15000,
+    min_volume_h24_usd: 20000,
+    min_age_minutes: 30,
+    max_age_days: 45,
+    max_fdv_to_liquidity_ratio: 60,
+    min_buy_ratio_h1: 0.45
+  },
+  scoring: {
+    weights: { liquidity: 15, turnover: 20, momentum: 25, buy_pressure: 20, age_fit: 10, safety: 10 },
+    liquidity_saturation_usd: 300000,
+    turnover_saturation_ratio: 4.0,
+    momentum_late_pump_threshold_pct: 150,
+    age_fit_sweet_spot_hours: [2, 240]
+  },
+  sell_rules: {
+    take_profit_pct: 60,
+    stop_loss_pct: -25,
+    trailing_stop_pct: -30,
+    liquidity_drop_pct: -40,
+    momentum_decay_volume_ratio: 0.15,
+    momentum_decay_min_hold_hours: 2
+  }
+};
+
+const ALL_CHAINS = ["solana", "base", "ethereum", "bsc", "arbitrum", "polygon", "avalanche", "sui"];
+const CFG_KEY = "coinfinder.config";
+const POS_KEY = "coinfinder.positions";
+
+function deepMerge(base, over) {
+  const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+  for (const [k, v] of Object.entries(over || {})) {
+    out[k] = (v && typeof v === "object" && !Array.isArray(v) && base && typeof base[k] === "object" && !Array.isArray(base[k]))
+      ? deepMerge(base[k], v) : v;
+  }
+  return out;
+}
+function loadJSON(key, fallback) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch (_) { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (_) { return false; }
+}
+
+let CONFIG = deepMerge(DEFAULTS, loadJSON(CFG_KEY, {}));
+
+/* ───────────────────────────── formatting ───────────────────────────── */
+const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+
+function usd(v) {
+  const n = Math.abs(v);
+  if (n >= 1e9) return "$" + (v / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return "$" + Math.round(v / 1e3) + "K";
+  return "$" + Math.round(v);
+}
+function usdExact(v) { return "$" + Math.round(v).toLocaleString("en-US"); }
+function price(p) {
+  if (!Number.isFinite(p) || p <= 0) return "—";
+  if (p >= 1) return "$" + p.toFixed(4).replace(/\.?0+$/, "");
+  const decimals = clamp(3 - Math.floor(Math.log10(p)), 4, 14);
+  return "$" + p.toFixed(decimals).replace(/0+$/, "");
+}
+function pct(v, digits = 1) { return (v >= 0 ? "+" : "") + v.toFixed(digits) + "%"; }
+function age(hours) {
+  if (hours <= 0) return "?";
+  if (hours < 1) return Math.round(hours * 60) + "m";
+  if (hours < 48) return Math.round(hours) + "h";
+  return Math.round(hours / 24) + "d";
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ───────────────────────────── data source ───────────────────────────── */
+const BASE = "https://api.dexscreener.com";
+let apiFailures = 0;
+
+async function getJSON(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers: { accept: "application/json" } });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (err) {
+    apiFailures++;
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* Flatten a DexScreener pair into the same shape the Python Candidate uses. */
+function candidateFrom(pair) {
+  const base = pair.baseToken || {};
+  const info = pair.info || {};
+  const socials = Array.isArray(info.socials) ? info.socials : [];
+  const websites = Array.isArray(info.websites) ? info.websites : [];
+  const c = {
+    chain: String(pair.chainId || "unknown"),
+    dex: String(pair.dexId || "unknown"),
+    pair_address: String(pair.pairAddress || ""),
+    token_address: String(base.address || ""),
+    symbol: String(base.symbol || "?"),
+    name: String(base.name || "?"),
+    url: String(pair.url || ""),
+    price_usd: num(pair.priceUsd),
+    liquidity_usd: num(pair.liquidity && pair.liquidity.usd),
+    fdv: num(pair.fdv),
+    market_cap: num(pair.marketCap),
+    volume_h24: num(pair.volume && pair.volume.h24),
+    volume_h6: num(pair.volume && pair.volume.h6),
+    volume_h1: num(pair.volume && pair.volume.h1),
+    price_change_h1: num(pair.priceChange && pair.priceChange.h1),
+    price_change_h6: num(pair.priceChange && pair.priceChange.h6),
+    price_change_h24: num(pair.priceChange && pair.priceChange.h24),
+    buys_h1: Math.trunc(num(pair.txns && pair.txns.h1 && pair.txns.h1.buys)),
+    sells_h1: Math.trunc(num(pair.txns && pair.txns.h1 && pair.txns.h1.sells)),
+    buys_h24: Math.trunc(num(pair.txns && pair.txns.h24 && pair.txns.h24.buys)),
+    sells_h24: Math.trunc(num(pair.txns && pair.txns.h24 && pair.txns.h24.sells)),
+    pair_created_at_ms: Math.trunc(num(pair.pairCreatedAt)),
+    socials: socials.length,
+    websites: websites.length,
+    boost_amount: 0,
+    score: 0, breakdown: {}, flags: [], reject_reasons: []
+  };
+  c.key = c.chain + ":" + c.pair_address;
+  c.age_minutes = c.pair_created_at_ms > 0 ? Math.max(0, (Date.now() - c.pair_created_at_ms) / 60000) : 0;
+  c.age_hours = c.age_minutes / 60;
+  const txns = c.buys_h1 + c.sells_h1;
+  c.buy_ratio_h1 = txns === 0 ? 0.5 : c.buys_h1 / txns;
+  c.turnover_ratio = c.liquidity_usd <= 0 ? 0 : c.volume_h24 / c.liquidity_usd;
+  c.fdv_to_liquidity = c.liquidity_usd <= 0 ? 0 : c.fdv / c.liquidity_usd;
+  if (!c.url) c.url = "https://dexscreener.com/" + c.chain + "/" + c.pair_address;
+  return c;
+}
+
+async function boostedTokens() {
+  const out = [];
+  for (const path of ["/token-boosts/latest/v1", "/token-boosts/top/v1"]) {
+    const payload = await getJSON(BASE + path);
+    if (Array.isArray(payload)) out.push(...payload.filter(x => x && typeof x === "object"));
+  }
+  return out;
+}
+
+async function pairsForTokens(chain, addresses) {
+  const unique = [...new Set(addresses.filter(Boolean))];
+  const pairs = [];
+  for (let i = 0; i < unique.length; i += 30) {
+    const batch = unique.slice(i, i + 30).join(",");
+    const payload = await getJSON(BASE + "/tokens/v1/" + chain + "/" + batch);
+    if (Array.isArray(payload)) pairs.push(...payload.filter(p => p && typeof p === "object"));
+    else if (payload && Array.isArray(payload.pairs)) pairs.push(...payload.pairs.filter(p => p && typeof p === "object"));
+  }
+  return pairs;
+}
+
+async function searchPairs(query) {
+  const payload = await getJSON(BASE + "/latest/dex/search?q=" + encodeURIComponent(query));
+  return payload && Array.isArray(payload.pairs) ? payload.pairs.filter(p => p && typeof p === "object") : [];
+}
+
+/* Two response shapes exist in the wild: a `pairs` list, and a singular `pair`
+   object. Accept both — getting this wrong reports every position as stale. */
+async function getPair(chain, pairAddress) {
+  const payload = await getJSON(BASE + "/latest/dex/pairs/" + chain + "/" + pairAddress);
+  if (!payload || typeof payload !== "object") return null;
+  if (Array.isArray(payload.pairs) && payload.pairs[0]) return candidateFrom(payload.pairs[0]);
+  if (payload.pair && typeof payload.pair === "object") return candidateFrom(payload.pair);
+  return null;
+}
+
+async function discover(onProgress) {
+  const chains = new Set(CONFIG.discovery.chains.map(c => String(c).toLowerCase()));
+  const rawPairs = [];
+  const boostAmounts = new Map();
+  const byChain = new Map();
+
+  onProgress("reading boost feed…");
+  for (const boost of await boostedTokens()) {
+    const chain = String(boost.chainId || "").toLowerCase();
+    const token = String(boost.tokenAddress || "");
+    if (!token || (chains.size && !chains.has(chain))) continue;
+    if (!byChain.has(chain)) byChain.set(chain, []);
+    byChain.get(chain).push(token);
+    boostAmounts.set(chain + ":" + token.toLowerCase(), num(boost.totalAmount ?? boost.amount));
+  }
+
+  for (const [chain, tokens] of byChain) {
+    onProgress("pricing " + chain + "…");
+    rawPairs.push(...await pairsForTokens(chain, tokens));
+  }
+
+  for (const term of CONFIG.discovery.search_terms) {
+    onProgress('searching "' + term + '"…');
+    rawPairs.push(...await searchPairs(String(term)));
+  }
+
+  const seen = new Set();
+  const candidates = [];
+  for (const pair of rawPairs) {
+    const c = candidateFrom(pair);
+    if (chains.size && !chains.has(c.chain.toLowerCase())) continue;
+    if (!c.pair_address || seen.has(c.key)) continue;
+    seen.add(c.key);
+    c.boost_amount = boostAmounts.get(c.chain.toLowerCase() + ":" + c.token_address.toLowerCase()) || 0;
+    candidates.push(c);
+  }
+  candidates.sort((a, b) => b.volume_h24 - a.volume_h24);
+  return candidates.slice(0, CONFIG.discovery.max_candidates);
+}
+
+/* ───────────────────────────── filters & scoring ───────────────────────────── */
+function applyFilters(c) {
+  const f = CONFIG.filters;
+  const reasons = [];
+
+  if (c.liquidity_usd < f.min_liquidity_usd)
+    reasons.push("liquidity " + usdExact(c.liquidity_usd) + " < " + usdExact(f.min_liquidity_usd));
+  if (c.volume_h24 < f.min_volume_h24_usd)
+    reasons.push("24h volume " + usdExact(c.volume_h24) + " < " + usdExact(f.min_volume_h24_usd));
+
+  // Age 0 means the provider omitted pairCreatedAt: unknown, not "brand new".
+  if (c.pair_created_at_ms > 0) {
+    if (c.age_minutes < f.min_age_minutes)
+      reasons.push("age " + c.age_minutes.toFixed(0) + "m < " + f.min_age_minutes + "m");
+    if (c.age_hours > f.max_age_days * 24)
+      reasons.push("age " + (c.age_hours / 24).toFixed(1) + "d > " + f.max_age_days + "d");
+  }
+  if (f.max_fdv_to_liquidity_ratio > 0 && c.fdv > 0 && c.fdv_to_liquidity > f.max_fdv_to_liquidity_ratio)
+    reasons.push("FDV/liquidity " + c.fdv_to_liquidity.toFixed(0) + "x > " + f.max_fdv_to_liquidity_ratio + "x");
+  if (c.buys_h1 + c.sells_h1 > 0 && c.buy_ratio_h1 < f.min_buy_ratio_h1)
+    reasons.push("1h buy ratio " + Math.round(c.buy_ratio_h1 * 100) + "% < " + Math.round(f.min_buy_ratio_h1 * 100) + "%");
+
+  return reasons;
+}
+
+function liquidityComponent(c) {
+  const sat = CONFIG.scoring.liquidity_saturation_usd;
+  if (sat <= 0) return 0;
+  return clamp(Math.sqrt(c.liquidity_usd / sat)); // sqrt: clearing the floor matters most
+}
+function turnoverComponent(c) {
+  const sat = CONFIG.scoring.turnover_saturation_ratio;
+  return sat <= 0 ? 0 : clamp(c.turnover_ratio / sat);
+}
+function momentumComponent(c) {
+  const late = CONFIG.scoring.momentum_late_pump_threshold_pct;
+  if (late <= 0) return 0;
+  const blended = 0.6 * c.price_change_h1 + 0.4 * c.price_change_h6;
+  if (blended <= -50) return 0;
+  if (blended < 0) return 0.2 * (1 + blended / 50);
+  if (blended <= late) return 0.2 + 0.8 * (blended / late);
+  return Math.max(0.25, 1 - (blended - late) / (late * 3)); // past the peak: decay, don't reward
+}
+function buyPressureComponent(c) {
+  const total = c.buys_h1 + c.sells_h1;
+  if (total === 0) return 0;
+  return clamp((c.buy_ratio_h1 - 0.35) / 0.40) * clamp(total / 50);
+}
+function ageFitComponent(c) {
+  if (c.pair_created_at_ms <= 0) return 0.5; // unknown: neither rewarded nor punished
+  const [low, high] = CONFIG.scoring.age_fit_sweet_spot_hours.map(Number);
+  const a = c.age_hours;
+  if (a >= low && a <= high) return 1;
+  if (a < low) return clamp(a / low) * 0.7;
+  return Math.max(0, 1 - (a - high) / (high * 2));
+}
+function safetyComponent(c) {
+  let score = 1;
+  const flags = [];
+  const maxRatio = CONFIG.filters.max_fdv_to_liquidity_ratio;
+
+  if (c.fdv > 0 && maxRatio > 0) {
+    const overhang = c.fdv_to_liquidity / maxRatio; // half the hard cap starts costing points
+    if (overhang > 0.5) {
+      score -= clamp((overhang - 0.5) / 0.5) * 0.35;
+      flags.push("FDV " + c.fdv_to_liquidity.toFixed(0) + "x liquidity");
+    }
+  }
+  if (!c.socials && !c.websites) { score -= 0.25; flags.push("no socials/website"); }
+  if (c.liquidity_usd < 30000) { score -= 0.20; flags.push("thin liquidity"); }
+
+  const total24 = c.buys_h24 + c.sells_h24;
+  if (total24 >= 50 && c.buys_h24 / total24 < 0.45) { score -= 0.20; flags.push("24h net selling"); }
+
+  if (c.volume_h1 > 0 && c.volume_h24 > 0 && c.volume_h1 < (c.volume_h24 / 24) * 0.25) {
+    score -= 0.15; flags.push("volume fading");
+  }
+  return [clamp(score), flags];
+}
+
+function scoreCandidate(c) {
+  const weights = CONFIG.scoring.weights;
+  const totalWeight = Object.values(weights).reduce((a, b) => a + num(b), 0);
+  const [safety, safetyFlags] = safetyComponent(c);
+  const components = {
+    liquidity: liquidityComponent(c),
+    turnover: turnoverComponent(c),
+    momentum: momentumComponent(c),
+    buy_pressure: buyPressureComponent(c),
+    age_fit: ageFitComponent(c),
+    safety: safety
+  };
+  let weighted = 0;
+  for (const [name, value] of Object.entries(components)) weighted += value * num(weights[name]);
+  c.score = totalWeight > 0 ? Math.round(1000 * weighted / totalWeight) / 10 : 0;
+  c.breakdown = components;
+
+  const flags = safetyFlags.slice();
+  const late = CONFIG.scoring.momentum_late_pump_threshold_pct;
+  if (c.price_change_h1 > late) flags.push("already pumped " + c.price_change_h1.toFixed(0) + "% in 1h");
+  if (c.boost_amount > 0) flags.push("paid boost " + c.boost_amount.toFixed(0));
+  c.flags = flags;
+  return c;
+}
+
+function rank(candidates) {
+  const passing = [], rejected = [];
+  for (const c of candidates) {
+    const reasons = applyFilters(c);
+    if (reasons.length) { c.reject_reasons = reasons; rejected.push(c); continue; }
+    passing.push(scoreCandidate(c));
+  }
+  passing.sort((a, b) => b.score - a.score);
+  return [passing, rejected];
+}
+
+/* ───────────────────────────── sell rules ───────────────────────────── */
+const SEVERITY = { HOLD: 0, TRIM: 1, SELL: 2, "URGENT SELL": 3 };
+
+function pctChange(current, reference) {
+  return reference <= 0 ? 0 : (current - reference) / reference * 100;
+}
+
+function evaluate(position, current) {
+  const rules = CONFIG.sell_rules;
+  if (!current || current.price_usd <= 0) {
+    return {
+      position, verdict: "HOLD", stale: true,
+      reasons: ["no live price available — could not evaluate, check manually"],
+      price_usd: 0, pnl_pct: 0, pnl_usd: 0, drawdown: 0, liquidity_change: 0
+    };
+  }
+
+  const p = current.price_usd;
+  const pnl_pct = pctChange(p, position.entry_price_usd);
+  const pnl_usd = position.amount_usd * pnl_pct / 100;
+  const peak = Math.max(position.peak_price_usd, p);
+  const drawdown = pctChange(p, peak);
+  const liquidity_change = pctChange(current.liquidity_usd, position.entry_liquidity_usd);
+
+  let verdict = "HOLD";
+  const reasons = [];
+  const escalate = (v, reason) => {
+    reasons.push(reason);
+    if (SEVERITY[v] > SEVERITY[verdict]) verdict = v;
+  };
+
+  if (position.entry_liquidity_usd > 0 && liquidity_change <= rules.liquidity_drop_pct) {
+    escalate("URGENT SELL", "liquidity down " + liquidity_change.toFixed(0) + "% since entry (" +
+      usdExact(position.entry_liquidity_usd) + " → " + usdExact(current.liquidity_usd) + ") — possible rug");
+  }
+  if (pnl_pct <= rules.stop_loss_pct)
+    escalate("SELL", "stop loss hit: " + pct(pnl_pct) + " (limit " + pct(rules.stop_loss_pct, 0) + ")");
+  if (pnl_pct >= rules.take_profit_pct)
+    escalate("SELL", "take profit hit: " + pct(pnl_pct) + " (target " + pct(rules.take_profit_pct, 0) + ")");
+  if (drawdown <= rules.trailing_stop_pct && p < peak)
+    escalate("SELL", "trailing stop: down " + drawdown.toFixed(0) + "% from peak " + price(peak) +
+      " (limit " + rules.trailing_stop_pct + "%)");
+
+  const holdHours = Math.max(0, (Date.now() / 1000 - position.opened_at) / 3600);
+  if (holdHours >= rules.momentum_decay_min_hold_hours && current.volume_h24 > 0) {
+    const hourly = current.volume_h24 / 24;
+    if (hourly > 0 && current.volume_h1 < hourly * rules.momentum_decay_volume_ratio) {
+      escalate("TRIM", "volume collapsing: 1h " + usdExact(current.volume_h1) + " vs " +
+        usdExact(hourly) + "/h average — interest is gone");
+    }
+  }
+  if (current.buys_h1 + current.sells_h1 >= 20 && current.buy_ratio_h1 < 0.35) {
+    escalate("TRIM", "sellers taking over: only " + Math.round(current.buy_ratio_h1 * 100) + "% of 1h trades are buys");
+  }
+  if (!reasons.length) reasons.push("holding at " + pct(pnl_pct) + ", no exit rule triggered");
+
+  return { position, verdict, reasons, price_usd: p, pnl_pct, pnl_usd, drawdown, liquidity_change, peak, hold_hours: holdHours, stale: false };
+}
+
+/* ───────────────────────────── positions store ───────────────────────────── */
+function loadPositions() {
+  const raw = loadJSON(POS_KEY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+function savePositions(list) { saveJSON(POS_KEY, list); renderBadge(list.length); }
+
+function parseTarget(text) {
+  const s = String(text || "").trim();
+  if (!s) return null;
+  const url = s.match(/dexscreener\.com\/([a-z0-9-]+)\/([A-Za-z0-9]+)/i);
+  if (url) return { chain: url[1].toLowerCase(), pair: url[2] };
+  const colon = s.match(/^([a-z0-9-]+)\s*:\s*([A-Za-z0-9]+)$/i);
+  if (colon) return { chain: colon[1].toLowerCase(), pair: colon[2] };
+  return null;
+}
+
+/* ───────────────────────────── rendering ───────────────────────────── */
+const $ = id => document.getElementById(id);
+const statusEl = $("status");
+let lastScan = [];
+let scanLimit = 10;
+
+function setStatus(text, sub) {
+  statusEl.innerHTML = esc(text) + (sub ? "<br>" + esc(sub) : "");
+}
+
+function apiErrorCard(what) {
+  return '<div class="card error"><b>Could not reach DexScreener</b>' +
+    '<p style="margin:8px 0 0;font-size:13px;color:var(--muted)">' +
+    esc(what) + ' No response from api.dexscreener.com. Check your connection — and if you are on a ' +
+    'VPN, corporate Wi-Fi, or a content blocker, that is the usual cause.</p></div>';
+}
+
+function componentBars(breakdown) {
+  return '<div class="bars">' + Object.entries(breakdown).map(([name, v]) =>
+    '<div class="cmp"><span>' + esc(name.replace("_", " ")) + '</span>' +
+    '<span class="track"><span class="fill" style="width:' + (v * 100).toFixed(0) + '%"></span></span>' +
+    '<em>' + v.toFixed(2) + '</em></div>'
+  ).join("") + '</div>';
+}
+
+function candidateCard(c, index) {
+  const chg = c.price_change_h1;
+  return '<div class="card' + (index === 0 ? " rank1" : "") + '">' +
+    '<div class="row"><span class="rank">' + (index + 1) + '</span>' +
+    '<span class="sym">' + esc(c.symbol) + '</span>' +
+    '<span class="chain">' + esc(c.chain) + '</span>' +
+    '<span class="score">' + c.score.toFixed(1) + '</span></div>' +
+    '<div class="name">' + esc(c.name) + '</div>' +
+    '<div class="stats">' +
+      '<div class="stat"><b>' + price(c.price_usd) + '</b><i>price</i></div>' +
+      '<div class="stat"><b class="' + (chg >= 0 ? "up" : "down") + '">' + pct(chg, 0) + '</b><i>1h</i></div>' +
+      '<div class="stat"><b>' + age(c.age_hours) + '</b><i>age</i></div>' +
+      '<div class="stat"><b>' + usd(c.liquidity_usd) + '</b><i>liquidity</i></div>' +
+      '<div class="stat"><b>' + usd(c.volume_h24) + '</b><i>vol 24h</i></div>' +
+      '<div class="stat"><b>' + Math.round(c.buy_ratio_h1 * 100) + '%</b><i>1h buys</i></div>' +
+    '</div>' +
+    componentBars(c.breakdown) +
+    (c.flags.length ? '<div class="flags">' + c.flags.map(f => '<span class="flag">' + esc(f) + '</span>').join("") + '</div>' : "") +
+    '<div class="actions">' +
+      '<a class="btn sm" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">Chart ↗</a>' +
+      '<button class="btn sm" data-track="' + esc(c.key) + '">Track</button>' +
+    '</div></div>';
+}
+
+function renderScan(passing, rejectedCount) {
+  const out = $("scan-out");
+  if (!passing.length) {
+    out.innerHTML = (apiFailures ? apiErrorCard("Discovery returned nothing.") : "") +
+      '<div class="empty"><b>Nothing passed the filters</b>' +
+      rejectedCount + ' candidate' + (rejectedCount === 1 ? "" : "s") + ' rejected. ' +
+      'An empty scan is a normal, healthy result — most scans should reject almost everything.</div>';
+    $("scan-more").hidden = true;
+    return;
+  }
+  out.innerHTML = passing.slice(0, scanLimit).map(candidateCard).join("");
+  $("scan-more").hidden = passing.length <= 10;
+  $("scan-more").textContent = scanLimit >= passing.length ? "Show 10" : "Show all " + passing.length;
+}
+
+async function runScan() {
+  const btn = $("scan-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scanning';
+  apiFailures = 0;
+  $("scan-out").innerHTML = '<div class="empty">Pulling live pairs…</div>';
+  try {
+    const candidates = await discover(msg => { $("scan-out").innerHTML = '<div class="empty">' + esc(msg) + '</div>'; });
+    const [passing, rejected] = rank(candidates);
+    lastScan = passing;
+    scanLimit = 10;
+    renderScan(passing, rejected.length);
+    setStatus(passing.length + " passed / " + rejected.length + " rejected",
+      "scanned " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Scan for buys";
+  }
+}
+
+function signalCard(sig) {
+  const p = sig.position;
+  const cls = sig.verdict === "URGENT SELL" ? "v-URGENT" : "v-" + sig.verdict;
+  const pnlCls = sig.pnl_pct >= 0 ? "up" : "down";
+  return '<div class="card">' +
+    '<div class="row"><span class="sym">' + esc(p.symbol) + '</span>' +
+    '<span class="chain">' + esc(p.chain) + '</span>' +
+    '<span style="margin-left:auto"><span class="verdict ' + cls + '">' + esc(sig.verdict) + '</span></span></div>' +
+    '<div class="stats" style="margin-top:10px">' +
+      '<div class="stat"><b class="' + pnlCls + '">' + pct(sig.pnl_pct) + '</b><i>P&amp;L</i></div>' +
+      '<div class="stat"><b class="' + pnlCls + '">' + (sig.pnl_usd >= 0 ? "+" : "−") + usdExact(Math.abs(sig.pnl_usd)) + '</b><i>USD</i></div>' +
+      '<div class="stat"><b>' + age(sig.hold_hours || 0) + '</b><i>held</i></div>' +
+      '<div class="stat"><b>' + price(p.entry_price_usd) + '</b><i>entry</i></div>' +
+      '<div class="stat"><b>' + price(sig.price_usd) + '</b><i>now</i></div>' +
+      '<div class="stat"><b>' + price(sig.peak || p.peak_price_usd) + '</b><i>peak</i></div>' +
+    '</div>' +
+    '<ul class="reasons">' + sig.reasons.map(r => "<li>" + esc(r) + "</li>").join("") + '</ul>' +
+    '<div class="actions">' +
+      '<a class="btn sm" href="https://dexscreener.com/' + esc(p.chain) + '/' + esc(p.pair_address) +
+        '" target="_blank" rel="noopener noreferrer">Chart ↗</a>' +
+      '<button class="btn sm" data-untrack="' + esc(p.key) + '">Untrack</button>' +
+    '</div></div>';
+}
+
+async function runCheck() {
+  const btn = $("check-btn");
+  const out = $("positions-out");
+  const positions = loadPositions();
+  renderBadge(positions.length);
+
+  if (!positions.length) {
+    out.innerHTML = '<div class="empty"><b>No positions tracked</b>' +
+      'After you buy, mirror the trade below so the exit rules know your entry.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking';
+  apiFailures = 0;
+  try {
+    const signals = [];
+    for (const p of positions) {
+      const current = await getPair(p.chain, p.pair_address);
+      if (current && current.price_usd > p.peak_price_usd) p.peak_price_usd = current.price_usd; // ratchets up only
+      signals.push(evaluate(p, current));
+    }
+    savePositions(positions); // persist the ratcheted peaks
+    signals.sort((a, b) => SEVERITY[b.verdict] - SEVERITY[a.verdict]);
+    const actionable = signals.filter(s => s.verdict !== "HOLD").length;
+    out.innerHTML = (apiFailures && signals.some(s => s.stale) ? apiErrorCard("Some positions could not be priced.") : "") +
+      signals.map(signalCard).join("");
+    setStatus(actionable ? actionable + " exit signal" + (actionable === 1 ? "" : "s") : "all holding",
+      "checked " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check exits";
+  }
+}
+
+async function trackPosition(chain, pairAddress, amountUsd, entryPrice) {
+  const positions = loadPositions();
+  const key = chain + ":" + pairAddress;
+  if (positions.some(p => p.key === key)) { alert("Already tracking " + key); return false; }
+
+  const current = await getPair(chain, pairAddress);
+  if (!current) { alert("Could not find that pair on DexScreener. Check the chain and pair address."); return false; }
+
+  const entry = entryPrice > 0 ? entryPrice : current.price_usd;
+  if (entry <= 0) { alert("No live price for that pair — pass an entry price manually."); return false; }
+
+  positions.push({
+    key, chain, pair_address: pairAddress, symbol: current.symbol,
+    entry_price_usd: entry, amount_usd: amountUsd,
+    entry_liquidity_usd: current.liquidity_usd,
+    opened_at: Date.now() / 1000,
+    peak_price_usd: Math.max(entry, current.price_usd),
+    note: ""
+  });
+  savePositions(positions);
+  return true;
+}
+
+function renderBadge(count) {
+  const badge = $("pos-badge");
+  badge.hidden = !count;
+  badge.textContent = count;
+}
+
+/* ───────────────────────────── settings form ───────────────────────────── */
+function renderChains() {
+  const selected = new Set(CONFIG.discovery.chains.map(c => c.toLowerCase()));
+  $("chain-chips").innerHTML = ALL_CHAINS.map(c =>
+    '<label class="chip"><input type="checkbox" value="' + c + '"' + (selected.has(c) ? " checked" : "") + '>' + c + '</label>'
+  ).join("");
+}
+
+function fillSettings() {
+  const f = CONFIG.filters, r = CONFIG.sell_rules, s = CONFIG.scoring;
+  renderChains();
+  $("s-terms").value = CONFIG.discovery.search_terms.join(", ");
+  $("f-liq").value = f.min_liquidity_usd;
+  $("f-vol").value = f.min_volume_h24_usd;
+  $("f-minage").value = f.min_age_minutes;
+  $("f-maxage").value = f.max_age_days;
+  $("f-fdv").value = f.max_fdv_to_liquidity_ratio;
+  $("f-buy").value = f.min_buy_ratio_h1;
+  $("r-tp").value = r.take_profit_pct;
+  $("r-sl").value = r.stop_loss_pct;
+  $("r-ts").value = r.trailing_stop_pct;
+  $("r-ld").value = r.liquidity_drop_pct;
+  for (const k of Object.keys(s.weights)) $("w-" + k).value = s.weights[k];
+  $("c-liqsat").value = s.liquidity_saturation_usd;
+  $("c-turnsat").value = s.turnover_saturation_ratio;
+  $("c-late").value = s.momentum_late_pump_threshold_pct;
+  $("c-agelo").value = s.age_fit_sweet_spot_hours[0];
+  $("c-agehi").value = s.age_fit_sweet_spot_hours[1];
+}
+
+function readSettings() {
+  const chains = [...document.querySelectorAll("#chain-chips input:checked")].map(i => i.value);
+  const terms = $("s-terms").value.split(",").map(t => t.trim()).filter(Boolean);
+  const weights = {};
+  for (const k of Object.keys(DEFAULTS.scoring.weights)) weights[k] = Math.max(0, num($("w-" + k).value, DEFAULTS.scoring.weights[k]));
+  if (!chains.length) { alert("Pick at least one chain."); return null; }
+  if (Object.values(weights).reduce((a, b) => a + b, 0) <= 0) { alert("At least one scoring weight must be above zero."); return null; }
+
+  return {
+    discovery: { chains, search_terms: terms, max_candidates: CONFIG.discovery.max_candidates },
+    filters: {
+      min_liquidity_usd: Math.max(0, num($("f-liq").value, DEFAULTS.filters.min_liquidity_usd)),
+      min_volume_h24_usd: Math.max(0, num($("f-vol").value, DEFAULTS.filters.min_volume_h24_usd)),
+      min_age_minutes: Math.max(0, num($("f-minage").value, DEFAULTS.filters.min_age_minutes)),
+      max_age_days: Math.max(0, num($("f-maxage").value, DEFAULTS.filters.max_age_days)),
+      max_fdv_to_liquidity_ratio: Math.max(0, num($("f-fdv").value, DEFAULTS.filters.max_fdv_to_liquidity_ratio)),
+      min_buy_ratio_h1: clamp(num($("f-buy").value, DEFAULTS.filters.min_buy_ratio_h1))
+    },
+    scoring: {
+      weights,
+      liquidity_saturation_usd: Math.max(1, num($("c-liqsat").value, DEFAULTS.scoring.liquidity_saturation_usd)),
+      turnover_saturation_ratio: Math.max(0.01, num($("c-turnsat").value, DEFAULTS.scoring.turnover_saturation_ratio)),
+      momentum_late_pump_threshold_pct: Math.max(1, num($("c-late").value, DEFAULTS.scoring.momentum_late_pump_threshold_pct)),
+      age_fit_sweet_spot_hours: [
+        Math.max(0.1, num($("c-agelo").value, 2)),
+        Math.max(1, num($("c-agehi").value, 240))
+      ]
+    },
+    sell_rules: {
+      take_profit_pct: num($("r-tp").value, DEFAULTS.sell_rules.take_profit_pct),
+      stop_loss_pct: num($("r-sl").value, DEFAULTS.sell_rules.stop_loss_pct),
+      trailing_stop_pct: num($("r-ts").value, DEFAULTS.sell_rules.trailing_stop_pct),
+      liquidity_drop_pct: num($("r-ld").value, DEFAULTS.sell_rules.liquidity_drop_pct),
+      momentum_decay_volume_ratio: CONFIG.sell_rules.momentum_decay_volume_ratio,
+      momentum_decay_min_hold_hours: CONFIG.sell_rules.momentum_decay_min_hold_hours
+    }
+  };
+}
+
+/* ───────────────────────────── wiring ───────────────────────────── */
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + btn.dataset.view));
+    window.scrollTo(0, 0);
+    if (btn.dataset.view === "positions" && !$("positions-out").innerHTML) runCheck();
+  });
+});
+
+$("scan-btn").addEventListener("click", runScan);
+$("scan-more").addEventListener("click", () => {
+  scanLimit = scanLimit >= lastScan.length ? 10 : lastScan.length;
+  renderScan(lastScan, 0);
+});
+$("check-btn").addEventListener("click", runCheck);
+
+$("scan-out").addEventListener("click", async ev => {
+  const btn = ev.target.closest("[data-track]");
+  if (!btn) return;
+  const c = lastScan.find(x => x.key === btn.dataset.track);
+  if (!c) return;
+  const raw = prompt("Position size in USD for " + c.symbol + "?", "250");
+  if (raw === null) return;
+  const amount = num(raw, 0);
+  if (amount <= 0) { alert("Enter a dollar amount above zero."); return; }
+  btn.disabled = true;
+  const ok = await trackPosition(c.chain, c.pair_address, amount, 0);
+  btn.disabled = false;
+  if (ok) { btn.textContent = "Tracked ✓"; $("positions-out").innerHTML = ""; }
+});
+
+$("positions-out").addEventListener("click", ev => {
+  const btn = ev.target.closest("[data-untrack]");
+  if (!btn) return;
+  if (!confirm("Stop tracking " + btn.dataset.untrack + "?")) return;
+  savePositions(loadPositions().filter(p => p.key !== btn.dataset.untrack));
+  runCheck();
+});
+
+$("track-btn").addEventListener("click", async () => {
+  const target = parseTarget($("t-url").value);
+  if (!target) { alert("Paste a DexScreener URL, or type chain:pairAddress."); return; }
+  const amount = num($("t-amount").value, 0);
+  if (amount <= 0) { alert("Enter a position size in USD."); return; }
+  const btn = $("track-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Looking up';
+  const ok = await trackPosition(target.chain, target.pair, amount, Math.max(0, num($("t-entry").value, 0)));
+  btn.disabled = false;
+  btn.textContent = "Track it";
+  if (ok) { $("t-url").value = ""; $("t-amount").value = ""; $("t-entry").value = ""; runCheck(); }
+});
+
+$("save-btn").addEventListener("click", () => {
+  const next = readSettings();
+  if (!next) return;
+  CONFIG = deepMerge(DEFAULTS, next);
+  saveJSON(CFG_KEY, next);
+  const btn = $("save-btn");
+  btn.textContent = "Saved ✓";
+  setTimeout(() => { btn.textContent = "Save settings"; }, 1400);
+  if (lastScan.length) { const [p, r] = rank(lastScan); lastScan = p; renderScan(p, r.length); }
+});
+
+$("reset-btn").addEventListener("click", () => {
+  if (!confirm("Reset all settings to defaults?")) return;
+  try { localStorage.removeItem(CFG_KEY); } catch (_) {}
+  CONFIG = deepMerge(DEFAULTS, {});
+  fillSettings();
+});
+
+let autoTimer = null;
+$("auto-refresh").addEventListener("change", ev => {
+  clearInterval(autoTimer);
+  autoTimer = ev.target.checked ? setInterval(runCheck, 120000) : null;
+  if (ev.target.checked) runCheck();
+});
+
+fillSettings();
+renderBadge(loadPositions().length);
+setStatus("ready", "no scan yet");
+</script>
+</body>
+</html>
